@@ -3,6 +3,7 @@ import { getOnboardingState, setOnboardingState } from "./database.js";
 
 export const PHASE = {
   NONE: "none",
+  AWAITING_ACTION: "awaiting_action",
   AWAITING_PIN_OR_LOCATION: "awaiting_pin_or_location",
   AWAITING_SALON_PICK: "awaiting_salon_pick",
   FLOW_SENT: "flow_sent"

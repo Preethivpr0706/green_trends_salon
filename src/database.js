@@ -13,6 +13,13 @@ let stateCache = null;
 let resolvedStatePath = null;
 let pool = null;
 
+function normalizePhone(value) {
+  const digits = String(value || "").replace(/\D+/g, "");
+  if (!digits) return "";
+  if (digits.length > 10) return digits.slice(-10);
+  return digits;
+}
+
 function getStatePath() {
   if (resolvedStatePath) return resolvedStatePath;
   const configured = process.env.DB_STATE_PATH || DEFAULT_STATE_PATH;
@@ -225,7 +232,7 @@ export function setFlowSession(flowToken, session) {
 export async function insertBooking(booking) {
   const db = getPool();
   const now = new Date();
-  const phone = String(booking.mobile || "").trim();
+  const phone = normalizePhone(booking.mobile);
   if (!phone) {
     throw new Error("mobile is required to create booking");
   }
@@ -435,6 +442,48 @@ export async function listBookings() {
       INNER JOIN users u ON u.id = a.user_id
       ORDER BY a.id DESC
     `
+  );
+
+  return rows.map((row) => ({
+    ...row,
+    createdAt: toIso(row.createdAt),
+    updatedAt: toIso(row.updatedAt)
+  }));
+}
+
+export async function listBookingsByMobile(mobile, limit = 10) {
+  const phone = normalizePhone(mobile);
+  if (!phone) return [];
+  const safeLimit = Math.max(1, Math.min(20, Number(limit) || 10));
+
+  const db = getPool();
+  const [rows] = await db.execute(
+    `
+      SELECT
+        a.booking_id AS bookingId,
+        a.status,
+        u.full_name AS fullName,
+        u.phone AS mobile,
+        u.email,
+        a.salon_id AS salonId,
+        a.salon_name AS salonName,
+        a.maps_url AS mapsUrl,
+        a.gender,
+        a.service_category AS serviceCategory,
+        a.service_item AS serviceItem,
+        a.service_blob AS serviceBlob,
+        a.booking_date AS date,
+        a.stylist_name AS stylistName,
+        a.time_slot AS timeSlot,
+        a.created_at AS createdAt,
+        a.updated_at AS updatedAt
+      FROM appointments a
+      INNER JOIN users u ON u.id = a.user_id
+      WHERE u.phone = ?
+      ORDER BY a.created_at DESC
+      LIMIT ${safeLimit}
+    `,
+    [phone]
   );
 
   return rows.map((row) => ({

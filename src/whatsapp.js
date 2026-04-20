@@ -121,6 +121,32 @@ export async function sendSalonListMessage(to, salonRows, headerText) {
   });
 }
 
+export async function sendWelcomeActionButtons(to) {
+  return sendMessage({
+    messaging_product: "whatsapp",
+    to,
+    type: "interactive",
+    interactive: {
+      type: "button",
+      body: {
+        text: "What would you like to do next?"
+      },
+      action: {
+        buttons: [
+          {
+            type: "reply",
+            reply: { id: "action_book", title: "Book Appointment" }
+          },
+          {
+            type: "reply",
+            reply: { id: "action_view", title: "View Appointments" }
+          }
+        ]
+      }
+    }
+  });
+}
+
 export async function sendBookingFlow(to, initialData = {}) {
   const data = { ...entryFlowInitialData(), ...initialData };
 

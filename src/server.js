@@ -6,6 +6,7 @@ import {
   getSalonById,
   initDatabase,
   insertBooking,
+  listBookingsByMobile,
   listAppointments,
   listBookings,
   listUsers
@@ -29,6 +30,7 @@ import {
   sendLocationMessage,
   sendLocationRequestMessage,
   sendSalonListMessage,
+  sendWelcomeActionButtons,
   sendText
 } from "./whatsapp.js";
 import { isAlreadyProcessedInbound } from "./webhookDedupe.js";
@@ -159,8 +161,19 @@ We are glad you are here! Next we will find salons near you (3–10 options).`;
     logWebhookError("welcome image (set PUBLIC_BASE_URL or WELCOME_IMAGE_URL)", imgErr);
   }
 
-  await delay(1000);
+  try {
+    await sendWelcomeActionButtons(from);
+    logWebhook("send", "welcome action buttons OK");
+  } catch (e) {
+    logWebhookError("welcome action buttons", e);
+    await sendText(from, "Reply with *book* to start booking or *view* to see your appointments.");
+  }
 
+  setOnboarding(from, { phase: PHASE.AWAITING_ACTION });
+}
+
+async function startBookingLocationFlow(from) {
+  await delay(300);
   try {
     await sendLocationRequestMessage(from);
     logWebhook("send", "location_request_message OK");
@@ -172,7 +185,7 @@ We are glad you are here! Next we will find salons near you (3–10 options).`;
     );
   }
 
-  await delay(400);
+  await delay(300);
   try {
     await sendText(from, "✏️ Or type your *6-digit area pincode* here (e.g. 600080).");
     logWebhook("send", "pincode hint OK");
@@ -181,6 +194,32 @@ We are glad you are here! Next we will find salons near you (3–10 options).`;
   }
 
   setOnboarding(from, { phase: PHASE.AWAITING_PIN_OR_LOCATION });
+}
+
+function formatAppointmentList(bookings) {
+  if (!bookings.length) {
+    return "🗂️ You do not have any appointments yet.\n\nTap *Book Appointment* to create one.";
+  }
+
+  const lines = ["🗂️ *Your recent appointments*"];
+  bookings.slice(0, 5).forEach((b, idx) => {
+    lines.push(
+      "",
+      `${idx + 1}. *${b.salonName || "Green Trends"}*`,
+      `   Date: ${b.date || "-"}`,
+      `   Time: ${b.timeSlot || "-"}`,
+      `   Service: ${b.serviceItem || b.serviceCategory || "-"}`,
+      `   Status: ${b.status || "PENDING_APPROVAL"}`
+    );
+  });
+  return lines.join("\n");
+}
+
+async function sendAppointmentsForCustomer(from) {
+  const bookings = await listBookingsByMobile(from, 5);
+  await sendText(from, formatAppointmentList(bookings));
+  await sendWelcomeActionButtons(from);
+  setOnboarding(from, { phase: PHASE.AWAITING_ACTION });
 }
 
 async function presentNearbySalonsOrRetry(from, nearbySalons) {
@@ -290,7 +329,22 @@ async function handleInboundText(msg) {
   if (!from) return;
 
   const text = msg.text?.body ?? "";
+  const norm = text.trim().toLowerCase();
   const { phase } = getOnboarding(from);
+
+  if (phase === PHASE.AWAITING_ACTION) {
+    if (norm.includes("book")) {
+      await startBookingLocationFlow(from);
+      return;
+    }
+    if (norm.includes("view") || norm.includes("appointment")) {
+      await sendAppointmentsForCustomer(from);
+      return;
+    }
+    await sendText(from, "Please choose *Book Appointment* or *View Appointments*.");
+    await sendWelcomeActionButtons(from);
+    return;
+  }
 
   if (phase === PHASE.AWAITING_SALON_PICK) {
     if (looksLikePincode(text)) {
@@ -352,6 +406,22 @@ async function handleInboundText(msg) {
   );
 }
 
+async function handleActionButtonReply(msg) {
+  const from = msg.from;
+  if (!from) return;
+  const btnId = msg.interactive?.button_reply?.id;
+  if (!btnId) return;
+
+  if (btnId === "action_book") {
+    await startBookingLocationFlow(from);
+    return;
+  }
+
+  if (btnId === "action_view") {
+    await sendAppointmentsForCustomer(from);
+  }
+}
+
 async function dispatchInboundMessage(msg) {
   const from = msg.from;
   if (!from) return;
@@ -364,6 +434,10 @@ async function dispatchInboundMessage(msg) {
     }
     if (iType === "list_reply") {
       await handleSalonListReply(msg);
+      return;
+    }
+    if (iType === "button_reply") {
+      await handleActionButtonReply(msg);
       return;
     }
     logWebhook("inbound", `interactive ignored type=${iType || "unknown"} (not a Flow response)`);
