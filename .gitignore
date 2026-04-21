@@ -1,6 +1,6 @@
 node_modules/
 .env
-keys/
+keys_me/
 *.pem
 .env.example
 scripts/generate-flow-keys.mjs
