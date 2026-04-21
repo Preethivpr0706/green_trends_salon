@@ -1,10 +1,10 @@
 import {
-  genderRadioOptions,
-  getCategoryTitleById,
-  listCategoriesForGender,
-  listServiceOptionsForCategory
-} from "./serviceCatalog.js";
-import { getAllSalons } from "./database.js";
+  getAllSalons,
+  getServiceCategoryTitleById,
+  listServiceCategoriesByGender,
+  listServicesByGenderCategory,
+  listStylistsBySalonGender
+} from "./database.js";
 
 function toRadians(value) {
   return (value * Math.PI) / 180;
@@ -130,15 +130,18 @@ export async function getNearestSalonsAsync({ pincode, lat, lng }) {
 }
 
 export function getGenderRadioOptions() {
-  return genderRadioOptions;
+  return [
+    { id: "male", title: "Male" },
+    { id: "female", title: "Female" }
+  ];
 }
 
-export function getCategoryOptionsForGender(gender) {
-  return listCategoriesForGender(gender);
+export async function getCategoryOptionsForGender(gender) {
+  return listServiceCategoriesByGender(gender);
 }
 
-export function getServiceOptionsForGenderCategory(gender, categoryId) {
-  return listServiceOptionsForCategory(gender, categoryId);
+export async function getServiceOptionsForGenderCategory(gender, categoryId) {
+  return listServicesByGenderCategory(gender, categoryId);
 }
 
 const BLOB_SEP = "###";
@@ -164,8 +167,8 @@ export function formatServicesPrettyFromBlob(blob) {
   return parts
     .map((p) => {
       const { service_category, service_item } = parseServiceOptionId(p);
-      const catTitle = getCategoryTitleById(service_category);
-      return service_item ? `${catTitle} — ${service_item}` : catTitle;
+      const catTitle = getServiceCategoryTitleById(service_category);
+      return service_item || catTitle;
     })
     .join("; ");
 }
@@ -182,85 +185,8 @@ export function parseServiceOptionId(id) {
   };
 }
 
-export function getStylists(salonId) {
-  return getStylistsByGender(salonId, "any");
-}
-
-const MALE_STYLIST_NAMES = [
-  "Arun",
-  "Karthik",
-  "Praveen",
-  "Rohit",
-  "Vikram",
-  "Suresh",
-  "Naveen",
-  "Ajay",
-  "Rahul",
-  "Harish"
-];
-
-const FEMALE_STYLIST_NAMES = [
-  "Priya",
-  "Divya",
-  "Anitha",
-  "Keerthana",
-  "Nandhini",
-  "Shalini",
-  "Meera",
-  "Swathi",
-  "Aishwarya",
-  "Lavanya"
-];
-
-const stylistCache = new Map();
-
-function hashString(value) {
-  let h = 0;
-  const s = String(value || "");
-  for (let i = 0; i < s.length; i += 1) {
-    h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  }
-  return h;
-}
-
-function seededShuffle(list, seedValue) {
-  const arr = [...list];
-  let seed = hashString(seedValue);
-  for (let i = arr.length - 1; i > 0; i -= 1) {
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    const j = seed % (i + 1);
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
-export function getStylistsByGender(salonId, gender = "any") {
-  const sid = String(salonId || "").trim();
-  if (!sid) {
-    return [{ id: "none", name: "No Preference" }];
-  }
-
-  const normalizedGender = String(gender || "any").toLowerCase();
-  const key = `${sid}::${normalizedGender}`;
-  if (stylistCache.has(key)) {
-    return stylistCache.get(key);
-  }
-
-  let baseNames = [...MALE_STYLIST_NAMES, ...FEMALE_STYLIST_NAMES];
-  if (normalizedGender === "male" || normalizedGender === "men") {
-    baseNames = MALE_STYLIST_NAMES;
-  } else if (normalizedGender === "female" || normalizedGender === "women") {
-    baseNames = FEMALE_STYLIST_NAMES;
-  }
-
-  const chosen = seededShuffle(baseNames, key).slice(0, 4).map((name, idx) => ({
-    id: `${sid}_${normalizedGender}_stylist_${idx + 1}`,
-    name
-  }));
-
-  const result = [{ id: "none", name: "No Preference" }, ...chosen];
-  stylistCache.set(key, result);
-  return result;
+export async function getStylistsByGender(salonId, gender = "any") {
+  return listStylistsBySalonGender(salonId, gender);
 }
 
 /** WhatsApp list row: title max 24, description max 72 characters. */
@@ -272,7 +198,7 @@ export function truncateSalonListTitle(name, max = 24) {
 }
 
 export function formatSalonListDescription(s) {
-  const bits = [s.area, s.city, s.pincode].filter(Boolean);
+  const bits = [s.city, s.pincode].filter(Boolean);
   let line = bits.join(" | ");
   if (s.distanceKm != null) line = `${line} | ~${s.distanceKm} km`.trim();
   if (!line) {
@@ -282,38 +208,77 @@ export function formatSalonListDescription(s) {
   return line;
 }
 
-export function getAvailableSlots({ date }) {
-  // Mocked availability for Phase 1 without POS sync.
-  const all = [
-    "11:00 AM",
-    "11:15 AM",
-    "11:30 AM",
-    "12:00 PM",
-    "12:15 PM",
-    "12:30 PM",
-    "01:00 PM",
-    "01:15 PM",
-    "02:00 PM",
-    "02:30 PM",
-    "03:00 PM",
-    "03:30 PM",
-    "04:00 PM",
-    "04:30 PM",
-    "05:00 PM",
-    "05:30 PM",
-    "06:00 PM",
-    "06:30 PM",
-    "06:45 PM"
-  ];
+export function getSalonListTitle(s) {
+  const area = String(s?.area || "").trim();
+  if (area) return truncateSalonListTitle(area);
+  return truncateSalonListTitle(s?.name || "Green Trends");
+}
 
-  // Small deterministic variation by date string.
-  const skipIndex = (date || "").length % 4;
+export function getAvailableSlots({ date, openHours }) {
+  return getAvailableSlotsByOpenHours({ date, openHours });
+}
+
+function timeStringToMinutes(value) {
+  const m = String(value || "")
+    .trim()
+    .match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/);
+  if (!m) return null;
+  let hour = Number(m[1]);
+  const minute = Number(m[2]);
+  const meridiem = m[3].toUpperCase();
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+  if (hour < 1 || hour > 12 || minute < 0 || minute > 59) return null;
+  if (meridiem === "PM" && hour !== 12) hour += 12;
+  if (meridiem === "AM" && hour === 12) hour = 0;
+  return hour * 60 + minute;
+}
+
+function minutesToTimeString(totalMinutes) {
+  const mins = ((totalMinutes % 1440) + 1440) % 1440;
+  const hour24 = Math.floor(mins / 60);
+  const minute = mins % 60;
+  const meridiem = hour24 >= 12 ? "PM" : "AM";
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  const mm = String(minute).padStart(2, "0");
+  return `${String(hour12).padStart(2, "0")}:${mm} ${meridiem}`;
+}
+
+function parseOpenHoursRange(openHours) {
+  const text = String(openHours || "").trim();
+  if (!text.includes("-")) return null;
+  const parts = text.split("-").map((p) => p.trim());
+  if (parts.length !== 2) return null;
+  const start = timeStringToMinutes(parts[0]);
+  const end = timeStringToMinutes(parts[1]);
+  if (start == null || end == null) return null;
+  return { start, end };
+}
+
+export function getAvailableSlotsByOpenHours({ date, openHours, stepMinutes = 30 }) {
+  const parsed = parseOpenHoursRange(openHours);
+  if (!parsed) {
+    // Fallback if open hours are unavailable.
+    return ["10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM", "12:00 PM", "12:30 PM"];
+  }
+
+  const { start, end } = parsed;
+  if (end <= start) {
+    return [];
+  }
+
+  const all = [];
+  for (let cur = start; cur <= end - stepMinutes; cur += stepMinutes) {
+    all.push(minutesToTimeString(cur));
+  }
+
+  // Keep deterministic thinning to simulate unavailable slots while preserving 30-min cadence.
+  const skipIndex = (String(date || "").length + start + end) % 4;
   return all.filter((_, idx) => idx % 4 !== skipIndex);
 }
 
 export function createPendingBooking(payload) {
   const now = new Date().toISOString();
-  const bookingId = `GT-${Date.now()}`;
+  const bookingId = `BK${Date.now().toString(36).toUpperCase()}${Math.floor(Math.random() * 900 + 100)}`;
   return {
     bookingId,
     status: "PENDING_APPROVAL",

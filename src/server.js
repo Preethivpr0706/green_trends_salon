@@ -95,7 +95,6 @@ async function handleFlowCompletion(msg) {
       "";
 
     const fallbackBooking = createPendingBooking({
-      bookingId: `GT-FLOW-${payload.flow_token || msg.id || Date.now()}`,
       fullName: payload.customer_name || "",
       mobile: payload.customer_mobile || from || "",
       email: payload.customer_email || "",
@@ -152,7 +151,7 @@ async function sendWelcomeImageAndAskLocation(msg) {
   const caption = `💚 *Welcome to Green Trends*
 Unisex Hair & Style Salon
 
-We are glad you are here! Next we will find salons near you (3–10 options).`;
+We are glad you are here! Next we will find salons near you.`;
 
   try {
     await sendImage(from, config.welcomeImageUrl, caption);
@@ -206,10 +205,10 @@ function formatAppointmentList(bookings) {
     lines.push(
       "",
       `${idx + 1}. *${b.salonName || "Green Trends"}*`,
+      `   Booking ID: ${b.bookingId || "-"}`,
       `   Date: ${b.date || "-"}`,
       `   Time: ${b.timeSlot || "-"}`,
-      `   Service: ${b.serviceItem || b.serviceCategory || "-"}`,
-      `   Status: ${b.status || "PENDING_APPROVAL"}`
+      `   Service: ${b.serviceItem || b.serviceCategory || "-"}`
     );
   });
   return lines.join("\n");
@@ -332,6 +331,11 @@ async function handleInboundText(msg) {
   const norm = text.trim().toLowerCase();
   const { phase } = getOnboarding(from);
 
+  if (isGreeting(text)) {
+    await sendWelcomeImageAndAskLocation(msg);
+    return;
+  }
+
   if (phase === PHASE.AWAITING_ACTION) {
     if (norm.includes("book")) {
       await startBookingLocationFlow(from);
@@ -374,19 +378,6 @@ async function handleInboundText(msg) {
     return;
   }
 
-  if (phase === PHASE.FLOW_SENT && isGreeting(text)) {
-    await sendText(
-      from,
-      "👋 You already have a *Book Appointment* button above — tap it to continue. Say *hi* anytime if you need the welcome message again (we will guide you). 💚"
-    );
-    return;
-  }
-
-  if (phase === PHASE.NONE && isGreeting(text)) {
-    await sendWelcomeImageAndAskLocation(msg);
-    return;
-  }
-
   if (phase === PHASE.NONE) {
     await sendText(
       from,
@@ -396,7 +387,8 @@ async function handleInboundText(msg) {
   }
 
   if (phase === PHASE.FLOW_SENT) {
-    await sendText(from, "👆 Tap *Book Appointment* above to continue your booking. 💚");
+    await sendWelcomeActionButtons(from);
+    setOnboarding(from, { phase: PHASE.AWAITING_ACTION });
     return;
   }
 

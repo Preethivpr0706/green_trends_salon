@@ -48,10 +48,6 @@
             "children": [
               { "type": "TextBody", "text": "UNISEX HAIR & STYLE SALON" },
               { "type": "TextHeading", "text": "Step 1/7 — Your details & gender" },
-              {
-                "type": "TextBody",
-                "text": "Menus (reference): https://www.mygreentrends.in/our-services-men/ · https://www.mygreentrends.in/womens-salon-services/"
-              },
               { "type": "TextBody", "text": "📍 *Your salon*" },
               { "type": "TextBody", "text": "${data.salon_name}" },
               { "type": "TextBody", "text": "${data.salon_address_line}" },
@@ -121,7 +117,6 @@
           "type": "string",
           "__example__": "Korattur, Chennai · Chennai · 600080"
         },
-        "maps_url": { "type": "string", "__example__": "https://maps.google.com/" },
         "salon_latitude": { "type": "string", "__example__": "13.1139" },
         "salon_longitude": { "type": "string", "__example__": "80.1856" },
         "service_blob": { "type": "string", "__example__": "" },
@@ -463,7 +458,7 @@
               { "type": "TextHeading", "text": "Step 6/7 — Pick a time slot" },
               {
                 "type": "TextBody",
-                "text": "Slots are sample availability (Phase 1). Final time is confirmed by the salon."
+                "text": "Slots are sample availability. Final time is confirmed by the salon."
               },
               {
                 "type": "Dropdown",
@@ -540,7 +535,7 @@
               { "type": "TextBody", "text": "${data.review_summary}" },
               {
                 "type": "TextBody",
-                "text": "After Confirm, you will get a summary, salon pin, and a thank-you in this chat."
+                "text": "After Confirm, you will get your booking summary and status in this chat."
               },
               {
                 "type": "Footer",
@@ -554,7 +549,6 @@
                     "salon_id": "${data.salon_id}",
                     "salon_name": "${data.salon_name}",
                     "salon_address_line": "${data.salon_address_line}",
-                    "maps_url": "${data.maps_url}",
                     "salon_latitude": "${data.salon_latitude}",
                     "salon_longitude": "${data.salon_longitude}",
                     "gender": "${data.gender}",

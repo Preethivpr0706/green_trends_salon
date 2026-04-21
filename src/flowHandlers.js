@@ -22,8 +22,8 @@ function mergeAndSaveSession(flowToken, session, patch) {
   return next;
 }
 
-function stylistDisplayName(salonId, stylistId, gender = "any") {
-  const list = getStylistsByGender(salonId, gender);
+async function stylistDisplayName(salonId, stylistId, gender = "any") {
+  const list = await getStylistsByGender(salonId, gender);
   const match = list.find((s) => s.id === stylistId);
   return match ? match.name : stylistId;
 }
@@ -51,7 +51,7 @@ async function buildReviewScreenData(incoming, session) {
     stylist_name = "No Preference";
   } else {
     stylist_name =
-      stylistDisplayName(d.salon_id, d.stylist_id, d.gender) || String(d.stylist_name || "");
+      (await stylistDisplayName(d.salon_id, d.stylist_id, d.gender)) || String(d.stylist_name || "");
   }
 
   const salon_name = String(salon?.name || d.salon_name || "");
@@ -86,8 +86,7 @@ async function buildReviewScreenData(incoming, session) {
     `Services: ${row.service_item_pretty}`,
     `Date: ${row.booking_date}`,
     `Time: ${row.slot_id}`,
-    `Stylist: ${row.stylist_name}`,
-    `Maps: ${row.maps_url}`
+    `Stylist: ${row.stylist_name}`
   ]
     .filter(Boolean)
     .join("\n");
@@ -162,7 +161,7 @@ export async function handleFlowDataExchange(reqBody) {
         salon_longitude:
           sal && sal.lng != null ? String(sal.lng) : String(data.salon_longitude || ""),
         service_blob: "",
-        category_options: getCategoryOptionsForGender(data.gender)
+        category_options: await getCategoryOptionsForGender(data.gender)
       }
     };
   }
@@ -190,7 +189,7 @@ export async function handleFlowDataExchange(reqBody) {
         salon_longitude: nextSession.salon_longitude,
         service_blob: nextSession.service_blob || "",
         category_id: data.category_id,
-        service_options: getServiceOptionsForGenderCategory(
+        service_options: await getServiceOptionsForGenderCategory(
           nextSession.gender,
           data.category_id
         )
@@ -249,13 +248,13 @@ export async function handleFlowDataExchange(reqBody) {
           salon_latitude: nextSession.salon_latitude,
           salon_longitude: nextSession.salon_longitude,
           service_blob: nextSession.service_blob || "",
-          category_options: getCategoryOptionsForGender(nextSession.gender)
+          category_options: await getCategoryOptionsForGender(nextSession.gender)
         }
       };
     }
 
     const sal = await getSalonById(nextSession.salon_id);
-    const stylistList = getStylistsByGender(nextSession.salon_id, nextSession.gender);
+    const stylistList = await getStylistsByGender(nextSession.salon_id, nextSession.gender);
     return {
       ...v,
       screen: "DATE_STYLIST",
@@ -279,12 +278,15 @@ export async function handleFlowDataExchange(reqBody) {
 
   if (screen === "DATE_STYLIST" && act === "data_exchange") {
     const merged = { ...session, ...data };
-    const slots = getAvailableSlots({ date: merged.booking_date });
     const sal = await getSalonById(merged.salon_id);
+    const slots = getAvailableSlots({
+      date: merged.booking_date,
+      openHours: sal?.openHours
+    });
     const stylist_name =
       !merged.stylist_id || merged.stylist_id === "none"
         ? "No Preference"
-        : stylistDisplayName(merged.salon_id, merged.stylist_id, merged.gender);
+        : await stylistDisplayName(merged.salon_id, merged.stylist_id, merged.gender);
 
     const nextSession = mergeAndSaveSession(flowToken, session, {
       ...merged,
@@ -336,13 +338,12 @@ export async function handleFlowDataExchange(reqBody) {
     const resolvedStylist =
       !d.stylist_id || d.stylist_id === "none"
         ? "No Preference"
-        : d.stylist_name || stylistDisplayName(d.salon_id, d.stylist_id, d.gender);
+        : d.stylist_name || (await stylistDisplayName(d.salon_id, d.stylist_id, d.gender));
 
     const parts = parseServiceBlobParts(d.service_blob);
     const primary = parts[0] ? parseServiceOptionId(parts[0]) : { service_category: "", service_item: "" };
 
     const booking = createPendingBooking({
-      bookingId: `GT-FLOW-${flowToken}`,
       fullName: d.customer_name,
       mobile: d.customer_mobile,
       email: d.customer_email || "",

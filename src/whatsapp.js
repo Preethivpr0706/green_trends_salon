@@ -2,8 +2,8 @@ import axios from "axios";
 import { config } from "./config.js";
 import {
   formatSalonListDescription,
-  getGenderRadioOptions,
-  truncateSalonListTitle
+  getSalonListTitle,
+  getGenderRadioOptions
 } from "./bookingEngine.js";
 
 const baseUrl = `https://graph.facebook.com/v22.0/${config.phoneNumberId}/messages`;
@@ -81,7 +81,7 @@ function entryFlowInitialData() {
 export async function sendLocationRequestMessage(to, bodyText) {
   const text =
     bodyText ||
-    "📍 Tap *Send location* below so we can list 3–10 nearby Green Trends salons for you.";
+    "📍 Tap *Send location* below so we can list nearby Green Trends salons for you.";
   return sendMessage({
     messaging_product: "whatsapp",
     to,
@@ -98,7 +98,7 @@ export async function sendLocationRequestMessage(to, bodyText) {
 export async function sendSalonListMessage(to, salonRows, headerText) {
   const rows = (salonRows || []).slice(0, 10).map((s) => ({
     id: s.id,
-    title: truncateSalonListTitle(s.name),
+    title: getSalonListTitle(s),
     description: formatSalonListDescription(s)
   }));
 
@@ -161,7 +161,7 @@ export async function sendBookingFlow(to, initialData = {}) {
         text: "Green Trends Appointment Booking"
       },
       body: {
-        text: "✨ Tap below to pick services, date & time — we will confirm with the salon (Phase 1)."
+        text: "✨ Tap below to pick services, date & time — we will confirm with the salon."
       },
       footer: {
         text: "COCO & FOFO booking assistant"
@@ -191,7 +191,16 @@ export async function sendBookingConfirmed(to, booking) {
 
   return sendText(
     to,
-    `Your booking is confirmed for ${booking.date} at ${booking.timeSlot} with ${stylistName} at ${booking.salonName}. Location Link: ${booking.mapsUrl}`
+    [
+      "✅ *Booking Confirmed*",
+      "",
+      `*Salon:* ${booking.salonName || "-"}`,
+      `*Date:* ${booking.date || "-"}`,
+      `*Time:* ${booking.timeSlot || "-"}`,
+      `*Stylist:* ${stylistName || "-"}`,
+      "",
+      "We will share the location pin separately in chat. 💚"
+    ].join("\n")
   );
 }
 
