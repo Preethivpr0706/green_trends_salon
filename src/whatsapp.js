@@ -147,8 +147,9 @@ export async function sendWelcomeActionButtons(to) {
   });
 }
 
-export async function sendBookingFlow(to, initialData = {}) {
+export async function sendBookingFlow(to, initialData = {}, flowToken = "") {
   const data = { ...entryFlowInitialData(), ...initialData };
+  const token = String(flowToken || `token_${Date.now()}`);
 
   return sendMessage({
     messaging_product: "whatsapp",
@@ -170,7 +171,7 @@ export async function sendBookingFlow(to, initialData = {}) {
         name: "flow",
         parameters: {
           flow_message_version: "3",
-          flow_token: `token_${Date.now()}`,
+          flow_token: token,
           flow_id: config.flowIdBookAppointment,
           flow_cta: "Book Appointment",
           flow_action: "navigate",

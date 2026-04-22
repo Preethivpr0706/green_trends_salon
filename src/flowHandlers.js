@@ -109,20 +109,26 @@ export async function handleFlowDataExchange(reqBody) {
   }
 
   if (act === "init") {
+    const initData = { ...session, ...data };
+    console.log(
+      `[flow:init] token=${flowToken} data_name=${Boolean(data.customer_name)} session_name=${Boolean(
+        session.customer_name
+      )} data_mobile=${Boolean(data.customer_mobile)} session_mobile=${Boolean(session.customer_mobile)}`
+    );
     return {
       ...v,
       screen: "ENTRY",
       data: {
-        customer_name: "",
-        customer_mobile: data.customer_mobile || "",
-        customer_email: "",
+        customer_name: initData.customer_name || "",
+        customer_mobile: initData.customer_mobile || "",
+        customer_email: initData.customer_email || "",
         gender_options: getGenderRadioOptions(),
-        salon_id: data.salon_id || "",
-        salon_name: data.salon_name || "",
-        salon_address_line: data.salon_address_line || "",
-        maps_url: data.maps_url || "",
-        salon_latitude: data.salon_latitude || "",
-        salon_longitude: data.salon_longitude || ""
+        salon_id: initData.salon_id || "",
+        salon_name: initData.salon_name || "",
+        salon_address_line: initData.salon_address_line || "",
+        maps_url: initData.maps_url || "",
+        salon_latitude: initData.salon_latitude || "",
+        salon_longitude: initData.salon_longitude || ""
       }
     };
   }

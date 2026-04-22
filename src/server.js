@@ -9,7 +9,8 @@ import {
   listBookingsByMobile,
   listAppointments,
   listBookings,
-  listUsers
+  listUsers,
+  setFlowSession
 } from "./database.js";
 import { createPendingBooking, formatServicesPrettyFromBlob, getNearestSalons } from "./bookingEngine.js";
 import { decryptFlowRequest, encryptFlowResponse, loadFlowPrivateKeyPem } from "./flowCrypto.js";
@@ -221,6 +222,25 @@ async function sendAppointmentsForCustomer(from) {
   setOnboarding(from, { phase: PHASE.AWAITING_ACTION });
 }
 
+function cleanProfileName(value) {
+  const v = String(value || "").trim();
+  if (!v) return "";
+  return v.replace(/\s+/g, " ").slice(0, 120);
+}
+
+function normalizeMobileForFlow(from) {
+  return String(from || "").replace(/\D+/g, "");
+}
+
+async function getKnownCustomerName(from) {
+  const fromOnboarding = cleanProfileName(getOnboarding(from).customer_name || "");
+  if (fromOnboarding) return fromOnboarding;
+
+  const recent = await listBookingsByMobile(from, 1);
+  const fromBooking = cleanProfileName(recent?.[0]?.fullName || "");
+  return fromBooking;
+}
+
 async function presentNearbySalonsOrRetry(from, nearbySalons) {
   if (!nearbySalons || nearbySalons.length === 0) {
     await sendText(
@@ -260,16 +280,24 @@ async function sendBookingFlowAfterSalonSelection(from, salon) {
   }
 
   const addressLine = [salon.area, salon.city, salon.pincode].filter(Boolean).join(" · ");
-
-  await sendBookingFlow(from, {
-    customer_mobile: from,
+  const customerName = await getKnownCustomerName(from);
+  const customerMobile = normalizeMobileForFlow(from);
+  const flowToken = `token_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+  const initialFlowData = {
+    customer_name: customerName,
+    customer_mobile: customerMobile,
     salon_id: salon.id,
     salon_name: salon.name,
     salon_address_line: addressLine,
     maps_url: salon.mapsUrl,
     salon_latitude: String(salon.lat),
     salon_longitude: String(salon.lng)
-  });
+  };
+
+  // Keep a server-side fallback so ENTRY can prefill even if init payload omits data.
+  setFlowSession(flowToken, initialFlowData);
+
+  await sendBookingFlow(from, initialFlowData, flowToken);
   logWebhook("send", "interactive Flow OK (salon pre-selected)");
   setOnboarding(from, { phase: PHASE.FLOW_SENT });
 }
@@ -417,6 +445,10 @@ async function handleActionButtonReply(msg) {
 async function dispatchInboundMessage(msg) {
   const from = msg.from;
   if (!from) return;
+  const waProfileName = cleanProfileName(msg.__profile_name || "");
+  if (waProfileName) {
+    setOnboarding(from, { customer_name: waProfileName });
+  }
 
   if (msg.type === "interactive") {
     const iType = msg.interactive?.type;
@@ -463,8 +495,16 @@ app.post("/webhook", (req, res) => {
           for (const change of changes) {
             if (change.field !== "messages") continue;
             const messages = change.value?.messages || [];
+            const contacts = change.value?.contacts || [];
+            const nameByWaId = new Map(
+              contacts.map((c) => [String(c?.wa_id || ""), c?.profile?.name || ""])
+            );
 
             for (const msg of messages) {
+              const profileName = nameByWaId.get(String(msg?.from || ""));
+              if (profileName) {
+                msg.__profile_name = profileName;
+              }
               if (isAlreadyProcessedInbound(msg)) {
                 logWebhook("dedupe", `skip duplicate id=${msg.id || msg.timestamp}`);
                 continue;

@@ -45,6 +45,11 @@
           {
             "type": "Form",
             "name": "entry_form",
+            "init-values": {
+              "customer_name": "${data.customer_name}",
+              "customer_mobile": "${data.customer_mobile}",
+              "customer_email": "${data.customer_email}"
+            },
             "children": [
               { "type": "TextBody", "text": "UNISEX HAIR & STYLE SALON" },
               { "type": "TextHeading", "text": "Step 1/7 — Your details & gender" },
