@@ -1,10 +1,11 @@
 import {
-  getAllSalons,
-  getServiceCategoryTitleById,
-  listServiceCategoriesByGender,
-  listServicesByGenderCategory,
-  listStylistsBySalonGender
-} from "./database.js";
+  fetchCategoriesForGender,
+  fetchStoresByLocation,
+  fetchStoresByPincode,
+  fetchStoresBySearchText,
+  fetchStylists,
+  getSalonFromCache
+} from "./gtlApi.js";
 
 function toRadians(value) {
   return (value * Math.PI) / 180;
@@ -77,13 +78,25 @@ function rankByPincodeDistance(anchorPincode, list) {
  * 3–10 nearby salons (fewer only if your catalogue has fewer salons).
  * Pincode: no matches → []. GPS: all salons ranked by distance.
  */
-export function getNearestSalons({ pincode, lat, lng }) {
-  return getNearestSalonsAsync({ pincode, lat, lng });
+export function getNearestSalons({ pincode, searchText, lat, lng }) {
+  return getNearestSalonsAsync({ pincode, searchText, lat, lng });
 }
 
-export async function getNearestSalonsAsync({ pincode, lat, lng }) {
-  const salons = await getAllSalons();
+export async function getNearestSalonsAsync({ pincode, searchText, lat, lng }) {
+  let salons = [];
+  const hasSearchText = searchText != null && String(searchText).trim() !== "";
+  if (searchText != null && String(searchText).trim() !== "") {
+    salons = await fetchStoresBySearchText(searchText);
+  } else if (pincode != null && String(pincode).trim() !== "") {
+    salons = await fetchStoresByPincode(pincode);
+  } else if (lat != null && lng != null) {
+    salons = await fetchStoresByLocation({ lat, lng });
+  }
   if (!salons.length) return [];
+
+  if (hasSearchText) {
+    return withNearbyBounds(salons, salons);
+  }
 
   if (pincode != null && String(pincode).trim() !== "") {
     const p = String(pincode).trim();
@@ -137,11 +150,7 @@ export function getGenderRadioOptions() {
 }
 
 export async function getCategoryOptionsForGender(gender) {
-  return listServiceCategoriesByGender(gender);
-}
-
-export async function getServiceOptionsForGenderCategory(gender, categoryId) {
-  return listServicesByGenderCategory(gender, categoryId);
+  return fetchCategoriesForGender(gender);
 }
 
 const BLOB_SEP = "###";
@@ -167,8 +176,7 @@ export function formatServicesPrettyFromBlob(blob) {
   return parts
     .map((p) => {
       const { service_category, service_item } = parseServiceOptionId(p);
-      const catTitle = getServiceCategoryTitleById(service_category);
-      return service_item || catTitle;
+      return service_item || service_category;
     })
     .join("; ");
 }
@@ -178,15 +186,23 @@ export function parseServiceOptionId(id) {
     return { service_category: "", service_item: "" };
   }
   const idx = id.indexOf("||");
-  if (idx === -1) return { service_category: "", service_item: id };
+  if (idx === -1) return { service_category: id, service_item: id };
   return {
     service_category: id.slice(0, idx),
     service_item: id.slice(idx + 2)
   };
 }
 
-export async function getStylistsByGender(salonId, gender = "any") {
-  return listStylistsBySalonGender(salonId, gender);
+export async function getStylistsByGender(salonId, gender = "any", aptDate) {
+  return fetchStylists({
+    storeId: salonId,
+    aptDate: aptDate || new Date().toISOString().slice(0, 10),
+    gender
+  });
+}
+
+export function getSalonByIdFromCache(salonId) {
+  return getSalonFromCache(salonId) || null;
 }
 
 /** WhatsApp list row: title max 24, description max 72 characters. */

@@ -3,7 +3,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { config, validateConfig } from "./config.js";
 import {
-  getSalonById,
   initDatabase,
   insertBooking,
   listBookingsByMobile,
@@ -12,14 +11,20 @@ import {
   listUsers,
   setFlowSession
 } from "./database.js";
-import { createPendingBooking, formatServicesPrettyFromBlob, getNearestSalons } from "./bookingEngine.js";
+import {
+  createPendingBooking,
+  formatServicesPrettyFromBlob,
+  getNearestSalons,
+  getSalonByIdFromCache
+} from "./bookingEngine.js";
+import { createAppointment } from "./gtlApi.js";
 import { decryptFlowRequest, encryptFlowResponse, loadFlowPrivateKeyPem } from "./flowCrypto.js";
 import { handleFlowDataExchange } from "./flowHandlers.js";
 import { formatBookingSummaryFromFlow, parseNfmReplyPayload } from "./flowWebhook.js";
 import {
   getOnboarding,
   isGreeting,
-  looksLikePincode,
+  looksLikeLocationSearchText,
   PHASE,
   setOnboarding
 } from "./onboardingState.js";
@@ -78,12 +83,7 @@ async function handleFlowCompletion(msg) {
   logWebhook("flow_response", `parsed keys=${Object.keys(payload).join(",")}`);
 
   const summary = formatBookingSummaryFromFlow(payload);
-  try {
-    await sendFlowCompletionSummary(from, summary);
-    logWebhook("send", "flow completion summary OK");
-  } catch (e) {
-    logWebhookError("send flow completion summary", e);
-  }
+  let addToCalendarSucceeded = false;
 
   // Fallback persistence: ensures bookings are stored even if Flow completion
   // reaches webhook but `/flow` complete-action did not persist.
@@ -113,12 +113,49 @@ async function handleFlowCompletion(msg) {
 
     await insertBooking(fallbackBooking);
     logWebhook("db", `booking persisted from nfm_reply id=${fallbackBooking.bookingId}`);
+
+    const addToCalendarPayload = {
+      storeid: Number(payload.salon_id || 0),
+      orgid: config.gtlOrgId,
+      name: payload.customer_name || "",
+      email: payload.customer_email || "",
+      mobile: payload.customer_mobile || from || "",
+      genderid: String(payload.gender || "").toLowerCase() === "male" ? 1 : 2,
+      notes: "Booked via WhatsApp",
+      service: servicePretty,
+      selectedDate: payload.booking_date || "",
+      time: normalizeTimeForApi(payload.slot_id),
+      id: payload.stylist_id === "none" ? "" : String(payload.stylist_id || "")
+    };
+    logWebhook("api", `addToCalendar request ${JSON.stringify(addToCalendarPayload)}`);
+    const addToCalendarResp = await createAppointment(addToCalendarPayload);
+    logWebhook("api", `addToCalendar success ${JSON.stringify(addToCalendarResp)}`);
+    addToCalendarSucceeded = true;
   } catch (persistErr) {
     logWebhookError("persist booking from nfm_reply", persistErr);
   }
 
-  const salon = await getSalonById(payload.salon_id);
-  if (salon && salon.lat != null && salon.lng != null) {
+  if (addToCalendarSucceeded) {
+    try {
+      await sendFlowCompletionSummary(from, summary);
+      logWebhook("send", "flow completion summary OK");
+    } catch (e) {
+      logWebhookError("send flow completion summary", e);
+    }
+  } else {
+    try {
+      await sendText(
+        from,
+        "We received your request, but booking confirmation is pending. Our team will get back to you shortly."
+      );
+      logWebhook("send", "booking pending message sent");
+    } catch (e) {
+      logWebhookError("send booking pending message", e);
+    }
+  }
+
+  const salon = getSalonByIdFromCache(payload.salon_id);
+  if (addToCalendarSucceeded && salon && salon.lat != null && salon.lng != null) {
     try {
       await sendLocationMessage(from, {
         latitude: salon.lat,
@@ -140,6 +177,22 @@ async function handleFlowCompletion(msg) {
       logWebhookError("send location pin", e);
     }
   }
+}
+
+function normalizeTimeForApi(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const firstPart = raw.split("-")[0].trim();
+  const m = firstPart.match(/^(\d{1,2}):(\d{2})(?:\s*([AP]M))?$/i);
+  if (!m) return firstPart;
+  let hh = Number(m[1]);
+  const mm = String(m[2]).padStart(2, "0");
+  const meridiem = (m[3] || "").toUpperCase();
+  if (meridiem) {
+    if (meridiem === "PM" && hh !== 12) hh += 12;
+    if (meridiem === "AM" && hh === 12) hh = 0;
+  }
+  return `${String(hh).padStart(2, "0")}:${mm}`;
 }
 
 /** Hi → welcome image first, then native location request + pincode hint (Flow opens after list pick). */
@@ -166,7 +219,7 @@ We are glad you are here! Next we will find salons near you.`;
     logWebhook("send", "welcome action buttons OK");
   } catch (e) {
     logWebhookError("welcome action buttons", e);
-    await sendText(from, "Reply with *book* to start booking or *view* to see your appointments.");
+    await sendText(from, "Reply with *book* to start booking.");
   }
 
   setOnboarding(from, { phase: PHASE.AWAITING_ACTION });
@@ -187,39 +240,13 @@ async function startBookingLocationFlow(from) {
 
   await delay(300);
   try {
-    await sendText(from, "✏️ Or type your *6-digit area pincode* here (e.g. 600080).");
+    await sendText(from, "✏️ Or type your *area pincode* or *city name* here (e.g. 600080 or Chennai).");
     logWebhook("send", "pincode hint OK");
   } catch (e) {
     logWebhookError("pincode hint", e);
   }
 
   setOnboarding(from, { phase: PHASE.AWAITING_PIN_OR_LOCATION });
-}
-
-function formatAppointmentList(bookings) {
-  if (!bookings.length) {
-    return "🗂️ You do not have any appointments yet.\n\nTap *Book Appointment* to create one.";
-  }
-
-  const lines = ["🗂️ *Your recent appointments*"];
-  bookings.slice(0, 5).forEach((b, idx) => {
-    lines.push(
-      "",
-      `${idx + 1}. *${b.salonName || "Green Trends"}*`,
-      `   Booking ID: ${b.bookingId || "-"}`,
-      `   Date: ${b.date || "-"}`,
-      `   Time: ${b.timeSlot || "-"}`,
-      `   Service: ${b.serviceItem || b.serviceCategory || "-"}`
-    );
-  });
-  return lines.join("\n");
-}
-
-async function sendAppointmentsForCustomer(from) {
-  const bookings = await listBookingsByMobile(from, 5);
-  await sendText(from, formatAppointmentList(bookings));
-  await sendWelcomeActionButtons(from);
-  setOnboarding(from, { phase: PHASE.AWAITING_ACTION });
 }
 
 function cleanProfileName(value) {
@@ -259,7 +286,7 @@ async function presentNearbySalonsOrRetry(from, nearbySalons) {
   try {
     await sendSalonListMessage(from, nearbySalons);
     logWebhook("send", "salon list interactive OK");
-    setOnboarding(from, { phase: PHASE.AWAITING_SALON_PICK });
+    setOnboarding(from, { phase: PHASE.AWAITING_SALON_PICK, nearby_salons: nearbySalons });
   } catch (e) {
     logWebhookError("sendSalonListMessage", e);
     await sendText(from, "⚠️ Could not show the salon list. Please try again in a moment.");
@@ -314,7 +341,7 @@ async function handleSalonListReply(msg) {
   const salonId = msg.interactive?.list_reply?.id;
   if (!salonId) return;
 
-  const salon = await getSalonById(salonId);
+  const salon = getOnboarding(from).nearby_salons?.find((s) => String(s.id) === String(salonId));
   if (!salon) {
     await sendText(from, "❗ That option is no longer valid. Please send *pincode* or *location* again.");
     setOnboarding(from, { phase: PHASE.AWAITING_PIN_OR_LOCATION });
@@ -369,19 +396,15 @@ async function handleInboundText(msg) {
       await startBookingLocationFlow(from);
       return;
     }
-    if (norm.includes("view") || norm.includes("appointment")) {
-      await sendAppointmentsForCustomer(from);
-      return;
-    }
-    await sendText(from, "Please choose *Book Appointment* or *View Appointments*.");
+    await sendText(from, "Please choose *Book Appointment*.");
     await sendWelcomeActionButtons(from);
     return;
   }
 
   if (phase === PHASE.AWAITING_SALON_PICK) {
-    if (looksLikePincode(text)) {
-      const nearby = await getNearestSalons({ pincode: text.trim() });
-      logWebhook("pincode_refresh", `${text.trim()} → ${nearby.length} salons`);
+    if (looksLikeLocationSearchText(text)) {
+      const nearby = await getNearestSalons({ searchText: text.trim() });
+      logWebhook("search_refresh", `${text.trim()} → ${nearby.length} salons`);
       await presentNearbySalonsOrRetry(from, nearby);
       return;
     }
@@ -393,15 +416,15 @@ async function handleInboundText(msg) {
   }
 
   if (phase === PHASE.AWAITING_PIN_OR_LOCATION) {
-    if (looksLikePincode(text)) {
-      const nearby = await getNearestSalons({ pincode: text.trim() });
-      logWebhook("pincode", `${text.trim()} → ${nearby.length} salons`);
+    if (looksLikeLocationSearchText(text)) {
+      const nearby = await getNearestSalons({ searchText: text.trim() });
+      logWebhook("search", `${text.trim()} → ${nearby.length} salons`);
       await presentNearbySalonsOrRetry(from, nearby);
       return;
     }
     await sendText(
       from,
-      "📌 Please send a valid *6-digit Indian pincode* (example: 600017) *or* share your live location 📎 → Location."
+      "📌 Please send a valid *pincode* or *city name* (example: 600017 / Chennai) *or* share your live location 📎 → Location."
     );
     return;
   }
@@ -434,11 +457,6 @@ async function handleActionButtonReply(msg) {
 
   if (btnId === "action_book") {
     await startBookingLocationFlow(from);
-    return;
-  }
-
-  if (btnId === "action_view") {
-    await sendAppointmentsForCustomer(from);
   }
 }
 
@@ -543,11 +561,19 @@ async function handleEncryptedFlow(req, res) {
       req.body,
       privateKeyPem
     );
+    console.log("[flow] decrypted request", {
+      action: decryptedBody?.action,
+      screen: decryptedBody?.screen || "init",
+      flow_token: decryptedBody?.flow_token ? "present" : "missing"
+    });
     const response = await handleFlowDataExchange(decryptedBody);
     const encrypted = encryptFlowResponse(response, aesKeyBuffer, initialVectorBuffer);
     return res.status(200).type("text/plain").send(encrypted);
   } catch (error) {
     console.error("Flow /flow error:", error.message);
+    if (error?.stack) {
+      console.error(error.stack);
+    }
     return res.status(421).type("text/plain").send("decryption_failed");
   }
 }

@@ -136,10 +136,6 @@ export async function sendWelcomeActionButtons(to) {
           {
             type: "reply",
             reply: { id: "action_book", title: "Book Appointment" }
-          },
-          {
-            type: "reply",
-            reply: { id: "action_view", title: "View Appointments" }
           }
         ]
       }

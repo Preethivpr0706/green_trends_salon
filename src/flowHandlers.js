@@ -2,15 +2,16 @@ import {
   appendServiceBlob,
   createPendingBooking,
   formatServicesPrettyFromBlob,
-  getAvailableSlots,
   getCategoryOptionsForGender,
+  getSalonByIdFromCache,
   getGenderRadioOptions,
-  getServiceOptionsForGenderCategory,
   getStylistsByGender,
   parseServiceBlobParts,
   parseServiceOptionId
 } from "./bookingEngine.js";
-import { getFlowSession, getSalonById, insertBooking, setFlowSession } from "./database.js";
+import { createAppointment, fetchSlots } from "./gtlApi.js";
+import { config } from "./config.js";
+import { getFlowSession, insertBooking, setFlowSession } from "./database.js";
 
 function getSession(flowToken) {
   return getFlowSession(flowToken);
@@ -34,14 +35,47 @@ function normAction(action) {
     .toLowerCase();
 }
 
-const addMoreOptions = () => [
-  { id: "yes", title: "Yes — add another service ➕" },
-  { id: "no", title: "No — continue ✓" }
-];
+function fallbackCategoryOptions() {
+  return [
+    { id: "haircut", title: "Haircut" },
+    { id: "facial", title: "Facial" },
+    { id: "cleanup", title: "Clean up" },
+    { id: "detan", title: "Detan" },
+    { id: "hair_spa", title: "Hair Spa" }
+  ];
+}
+
+async function safeCategoryOptionsForGender(gender) {
+  try {
+    const options = await getCategoryOptionsForGender(gender);
+    if (Array.isArray(options) && options.length > 0) return options;
+    console.warn("[flow] category_options empty, using fallback");
+    return fallbackCategoryOptions();
+  } catch (error) {
+    console.warn("[flow] category_options failed, using fallback", error.message);
+    return fallbackCategoryOptions();
+  }
+}
+
+function normalizeTimeForApi(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const firstPart = raw.split("-")[0].trim();
+  const m = firstPart.match(/^(\d{1,2}):(\d{2})(?:\s*([AP]M))?$/i);
+  if (!m) return firstPart;
+  let hh = Number(m[1]);
+  const mm = String(m[2]).padStart(2, "0");
+  const meridiem = (m[3] || "").toUpperCase();
+  if (meridiem) {
+    if (meridiem === "PM" && hh !== 12) hh += 12;
+    if (meridiem === "AM" && hh === 12) hh = 0;
+  }
+  return `${String(hh).padStart(2, "0")}:${mm}`;
+}
 
 async function buildReviewScreenData(incoming, session) {
   const d = { ...session, ...incoming };
-  const salon = await getSalonById(d.salon_id);
+  const salon = getSalonByIdFromCache(d.salon_id);
   const blob = String(d.service_blob || "");
   const service_item_pretty =
     formatServicesPrettyFromBlob(blob) || String(d.service_item_pretty || "");
@@ -101,6 +135,11 @@ export async function handleFlowDataExchange(reqBody) {
   const data = reqBody.data || {};
   const session = getSession(flowToken);
   const act = normAction(action);
+  console.log("[flow] inbound", {
+    action: act,
+    screen: screen || "init",
+    dataKeys: Object.keys(data || {})
+  });
 
   const v = { version: "3.0" };
 
@@ -134,7 +173,7 @@ export async function handleFlowDataExchange(reqBody) {
   }
 
   if (screen === "ENTRY" && act === "data_exchange") {
-    const sal = await getSalonById(data.salon_id);
+    const sal = getSalonByIdFromCache(data.salon_id);
     const salon_name = sal?.name || data.salon_name || "";
     const maps_url = sal?.mapsUrl || data.maps_url || "";
     Object.assign(session, {
@@ -167,100 +206,62 @@ export async function handleFlowDataExchange(reqBody) {
         salon_longitude:
           sal && sal.lng != null ? String(sal.lng) : String(data.salon_longitude || ""),
         service_blob: "",
-        category_options: await getCategoryOptionsForGender(data.gender)
+        category_options: await safeCategoryOptionsForGender(data.gender)
       }
     };
   }
 
   if (screen === "CATEGORY" && act === "data_exchange") {
     const merged = { ...session, ...data };
-    const nextSession = mergeAndSaveSession(flowToken, session, {
-      ...merged,
-      category_id: data.category_id
-    });
+    const categories = await safeCategoryOptionsForGender(merged.gender);
+    const selectedRaw = data.selected_categories;
+    let selectedIds = [];
+    if (Array.isArray(selectedRaw)) {
+      selectedIds = selectedRaw.map((v) => String(v || "").trim()).filter(Boolean);
+    } else if (typeof selectedRaw === "string" && selectedRaw.trim()) {
+      // Some flow runtimes serialize array-like values as comma-separated strings.
+      selectedIds = selectedRaw
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean);
+    } else {
+      // Backward compatibility with older form payloads.
+      selectedIds = [
+        data.category_id,
+        data.additional_category_id,
+        data.additional_category_id_2,
+        data.additional_category_id_3,
+        data.additional_category_id_4,
+        data.additional_category_id_5,
+        data.additional_category_id_6
+      ]
+        .map((v) => String(v || "").trim())
+        .filter(Boolean);
+    }
 
-    return {
-      ...v,
-      screen: "SERVICE_PICK",
-      data: {
-        customer_name: nextSession.customer_name,
-        customer_mobile: nextSession.customer_mobile,
-        customer_email: nextSession.customer_email || "",
-        gender: nextSession.gender,
-        salon_id: nextSession.salon_id,
-        salon_name: nextSession.salon_name,
-        salon_address_line: nextSession.salon_address_line || "",
-        maps_url: nextSession.maps_url,
-        salon_latitude: nextSession.salon_latitude,
-        salon_longitude: nextSession.salon_longitude,
-        service_blob: nextSession.service_blob || "",
-        category_id: data.category_id,
-        service_options: await getServiceOptionsForGenderCategory(
-          nextSession.gender,
-          data.category_id
-        )
-      }
-    };
-  }
-
-  if (screen === "SERVICE_PICK" && act === "data_exchange") {
-    const merged = { ...session, ...data };
-    const newBlob = appendServiceBlob(merged.service_blob, data.service_item);
+    let newBlob = merged.service_blob || "";
+    const seen = new Set();
+    for (const id of selectedIds) {
+      const match = categories.find((c) => String(c.id) === id);
+      if (!match || seen.has(String(match.id))) continue;
+      seen.add(String(match.id));
+      newBlob = appendServiceBlob(newBlob, `${match.id}||${match.title}`);
+    }
     const services_pretty = formatServicesPrettyFromBlob(newBlob);
+    const sal = getSalonByIdFromCache(merged.salon_id);
+    let stylistList = [{ id: "none", name: "No Preference" }];
+    try {
+      stylistList = await getStylistsByGender(merged.salon_id, merged.gender, merged.booking_date);
+    } catch (err) {
+      console.warn("[flow] getStylistsByGender failed, using fallback", err.message);
+    }
     const nextSession = mergeAndSaveSession(flowToken, session, {
       ...merged,
+        selected_categories: selectedIds,
       service_blob: newBlob,
       services_pretty
     });
 
-    return {
-      ...v,
-      screen: "MORE_SERVICES",
-      data: {
-        customer_name: nextSession.customer_name,
-        customer_mobile: nextSession.customer_mobile,
-        customer_email: nextSession.customer_email || "",
-        gender: nextSession.gender,
-        salon_id: nextSession.salon_id,
-        salon_name: nextSession.salon_name,
-        salon_address_line: nextSession.salon_address_line || "",
-        maps_url: nextSession.maps_url,
-        salon_latitude: nextSession.salon_latitude,
-        salon_longitude: nextSession.salon_longitude,
-        service_blob: newBlob,
-        services_pretty,
-        add_more_options: addMoreOptions()
-      }
-    };
-  }
-
-  if (screen === "MORE_SERVICES" && act === "data_exchange") {
-    const merged = { ...session, ...data };
-    const nextSession = mergeAndSaveSession(flowToken, session, merged);
-
-    if (nextSession.add_more === "yes") {
-      return {
-        ...v,
-        screen: "CATEGORY",
-        data: {
-          customer_name: nextSession.customer_name,
-          customer_mobile: nextSession.customer_mobile,
-          customer_email: nextSession.customer_email || "",
-          gender: nextSession.gender,
-          salon_id: nextSession.salon_id,
-          salon_name: nextSession.salon_name,
-          salon_address_line: nextSession.salon_address_line || "",
-          maps_url: nextSession.maps_url,
-          salon_latitude: nextSession.salon_latitude,
-          salon_longitude: nextSession.salon_longitude,
-          service_blob: nextSession.service_blob || "",
-          category_options: await getCategoryOptionsForGender(nextSession.gender)
-        }
-      };
-    }
-
-    const sal = await getSalonById(nextSession.salon_id);
-    const stylistList = await getStylistsByGender(nextSession.salon_id, nextSession.gender);
     return {
       ...v,
       screen: "DATE_STYLIST",
@@ -275,24 +276,25 @@ export async function handleFlowDataExchange(reqBody) {
         maps_url: sal?.mapsUrl || nextSession.maps_url || "",
         salon_latitude: sal ? String(sal.lat) : nextSession.salon_latitude || "",
         salon_longitude: sal ? String(sal.lng) : nextSession.salon_longitude || "",
-        service_blob: nextSession.service_blob || "",
-        services_pretty: formatServicesPrettyFromBlob(nextSession.service_blob || ""),
-        stylist_options: stylistList.map((s) => ({ id: s.id, title: s.name }))
+        service_blob: newBlob,
+        services_pretty,
+        stylist_options: stylistList.map((s) => ({ id: s.id, title: s.displayTitle || s.name }))
       }
     };
   }
 
   if (screen === "DATE_STYLIST" && act === "data_exchange") {
     const merged = { ...session, ...data };
-    const sal = await getSalonById(merged.salon_id);
-    const slots = getAvailableSlots({
-      date: merged.booking_date,
-      openHours: sal?.openHours
-    });
+    const sal = getSalonByIdFromCache(merged.salon_id);
     const stylist_name =
       !merged.stylist_id || merged.stylist_id === "none"
         ? "No Preference"
         : await stylistDisplayName(merged.salon_id, merged.stylist_id, merged.gender);
+    const slots = await fetchSlots({
+      storeId: merged.salon_id,
+      aptDate: merged.booking_date,
+      empId: merged.stylist_id
+    });
 
     const nextSession = mergeAndSaveSession(flowToken, session, {
       ...merged,
@@ -320,7 +322,7 @@ export async function handleFlowDataExchange(reqBody) {
         booking_date: nextSession.booking_date,
         stylist_id: nextSession.stylist_id,
         stylist_name,
-        slot_options: slots.map((slot) => ({ id: slot, title: slot }))
+        slot_options: slots
       }
     };
   }
@@ -339,7 +341,7 @@ export async function handleFlowDataExchange(reqBody) {
   if (screen === "REVIEW" && act === "complete") {
     const d = { ...session, ...data };
     const selectedSalon =
-      (await getSalonById(d.salon_id)) ||
+      getSalonByIdFromCache(d.salon_id) ||
       (session.salons || []).find((s) => s.id === d.salon_id);
     const resolvedStylist =
       !d.stylist_id || d.stylist_id === "none"
@@ -367,6 +369,26 @@ export async function handleFlowDataExchange(reqBody) {
 
     mergeAndSaveSession(flowToken, session, { ...d, lastBooking: booking });
     await insertBooking(booking);
+    try {
+      const addToCalendarPayload = {
+        storeid: Number(d.salon_id),
+        orgid: config.gtlOrgId,
+        name: d.customer_name,
+        email: d.customer_email || "",
+        mobile: d.customer_mobile,
+        genderid: String(d.gender || "").toLowerCase() === "male" ? 1 : 2,
+        notes: "Booked via WhatsApp",
+        service: formatServicesPrettyFromBlob(d.service_blob) || d.service_item_pretty || "",
+        selectedDate: d.booking_date,
+        time: normalizeTimeForApi(d.slot_id),
+        id: d.stylist_id === "none" ? "" : String(d.stylist_id || "")
+      };
+      console.log("[flow] addToCalendar request payload", addToCalendarPayload);
+      const addToCalendarResponse = await createAppointment(addToCalendarPayload);
+      console.log("[flow] addToCalendar success response", addToCalendarResponse);
+    } catch (error) {
+      console.warn("[flow] addToCalendar failed", error.message);
+    }
     return {
       ...v,
       data: {

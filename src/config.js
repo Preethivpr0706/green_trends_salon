@@ -20,6 +20,10 @@ export const config = {
   phoneNumberId: process.env.PHONE_NUMBER_ID || "",
   flowIdBookAppointment: process.env.FLOW_ID_BOOK_APPOINTMENT || "",
   appSecret: process.env.APP_SECRET || "",
+  gtlApiBaseUrl: process.env.GTL_API_BASE_URL || "https://gtlvl.innosmarti.com",
+  gtlOrgId: Number(process.env.GTL_ORG_ID || 1001),
+  gtlBrandId: Number(process.env.GTL_BRAND_ID || 1),
+  gtlApiCookie: process.env.GTL_API_COOKIE || "",
   /** Set PUBLIC_BASE_URL (e.g. https://xxx.ngrok-free.app) so /static/green-trends-welcome.png works, or set WELCOME_IMAGE_URL. */
   get welcomeImageUrl() {
     return resolveWelcomeImageUrl();

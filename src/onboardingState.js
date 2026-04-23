@@ -31,3 +31,10 @@ export function isGreeting(text) {
 export function looksLikePincode(text) {
   return /^\d{6}$/.test(String(text || "").trim());
 }
+
+export function looksLikeLocationSearchText(text) {
+  const t = String(text || "").trim();
+  if (!t || t.length < 3) return false;
+  if (looksLikePincode(t)) return true;
+  return /^[a-zA-Z0-9\s.-]+$/.test(t);
+}

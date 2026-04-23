@@ -3,9 +3,7 @@
   "data_api_version": "3.0",
   "routing_model": {
     "ENTRY": ["CATEGORY"],
-    "CATEGORY": ["SERVICE_PICK"],
-    "SERVICE_PICK": ["MORE_SERVICES"],
-    "MORE_SERVICES": ["CATEGORY", "DATE_STYLIST"],
+    "CATEGORY": ["DATE_STYLIST"],
     "DATE_STYLIST": ["SLOT"],
     "SLOT": ["REVIEW"],
     "REVIEW": []
@@ -52,10 +50,16 @@
             },
             "children": [
               { "type": "TextBody", "text": "UNISEX HAIR & STYLE SALON" },
-              { "type": "TextHeading", "text": "Step 1/7 — Your details & gender" },
-              { "type": "TextBody", "text": "📍 *Your salon*" },
+              { "type": "TextBody", "text": "Step 1/4 — Gender & your details" },
               { "type": "TextBody", "text": "${data.salon_name}" },
               { "type": "TextBody", "text": "${data.salon_address_line}" },
+              {
+                "type": "RadioButtonsGroup",
+                "name": "gender",
+                "label": "Gender",
+                "required": true,
+                "data-source": "${data.gender_options}"
+              },
               {
                 "type": "TextInput",
                 "name": "customer_name",
@@ -73,16 +77,9 @@
               {
                 "type": "TextInput",
                 "name": "customer_email",
-                "label": "Email (Optional)",
+                "label": "Email",
                 "required": false,
                 "input-type": "email"
-              },
-              {
-                "type": "RadioButtonsGroup",
-                "name": "gender",
-                "label": "Gender",
-                "required": true,
-                "data-source": "${data.gender_options}"
               },
               {
                 "type": "Footer",
@@ -122,9 +119,15 @@
           "type": "string",
           "__example__": "Korattur, Chennai · Chennai · 600080"
         },
+        "maps_url": { "type": "string", "__example__": "https://maps.google.com/" },
         "salon_latitude": { "type": "string", "__example__": "13.1139" },
         "salon_longitude": { "type": "string", "__example__": "80.1856" },
         "service_blob": { "type": "string", "__example__": "" },
+        "selected_categories": {
+          "type": "array",
+          "items": { "type": "string" },
+          "__example__": ["haircut", "facial"]
+        },
         "category_options": {
           "type": "array",
           "items": {
@@ -145,15 +148,11 @@
             "name": "category_form",
             "children": [
               { "type": "TextBody", "text": "UNISEX HAIR & STYLE SALON" },
-              { "type": "TextHeading", "text": "Step 2/7 — Pick a category" },
+              { "type": "TextBody", "text": "Step 2/4 — Select services" },
               {
-                "type": "TextBody",
-                "text": "Categories follow Green Trends menus by gender. Add more services on the next steps if you like."
-              },
-              {
-                "type": "Dropdown",
-                "name": "category_id",
-                "label": "Service category",
+                "type": "CheckboxGroup",
+                "name": "selected_categories",
+                "label": "Select services",
                 "required": true,
                 "data-source": "${data.category_options}"
               },
@@ -174,160 +173,7 @@
                     "salon_latitude": "${data.salon_latitude}",
                     "salon_longitude": "${data.salon_longitude}",
                     "service_blob": "${data.service_blob}",
-                    "category_id": "${form.category_id}"
-                  }
-                }
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": "SERVICE_PICK",
-      "title": "Green Trends",
-      "data": {
-        "customer_name": { "type": "string", "__example__": "Aarthi Kumar" },
-        "customer_mobile": { "type": "string", "__example__": "919876543210" },
-        "customer_email": { "type": "string", "__example__": "" },
-        "gender": { "type": "string", "__example__": "female" },
-        "salon_id": { "type": "string", "__example__": "salon_korattur" },
-        "salon_name": { "type": "string", "__example__": "Green Trends - Korattur" },
-        "salon_address_line": {
-          "type": "string",
-          "__example__": "Korattur, Chennai · Chennai · 600080"
-        },
-        "maps_url": { "type": "string", "__example__": "https://maps.google.com/" },
-        "salon_latitude": { "type": "string", "__example__": "13.1139" },
-        "salon_longitude": { "type": "string", "__example__": "80.1856" },
-        "service_blob": { "type": "string", "__example__": "" },
-        "category_id": { "type": "string", "__example__": "f_hair_spa" },
-        "service_options": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": { "type": "string" },
-              "title": { "type": "string" }
-            }
-          },
-          "__example__": [{ "id": "f_hair_spa||Loreal Hair Spa Medium", "title": "Loreal Hair Spa Medium" }]
-        }
-      },
-      "layout": {
-        "type": "SingleColumnLayout",
-        "children": [
-          {
-            "type": "Form",
-            "name": "service_form",
-            "children": [
-              { "type": "TextBody", "text": "UNISEX HAIR & STYLE SALON" },
-              { "type": "TextHeading", "text": "Step 3/7 — Choose a service" },
-              {
-                "type": "Dropdown",
-                "name": "service_item",
-                "label": "Service",
-                "required": true,
-                "data-source": "${data.service_options}"
-              },
-              {
-                "type": "Footer",
-                "label": "Next",
-                "on-click-action": {
-                  "name": "data_exchange",
-                  "payload": {
-                    "customer_name": "${data.customer_name}",
-                    "customer_mobile": "${data.customer_mobile}",
-                    "customer_email": "${data.customer_email}",
-                    "gender": "${data.gender}",
-                    "salon_id": "${data.salon_id}",
-                    "salon_name": "${data.salon_name}",
-                    "salon_address_line": "${data.salon_address_line}",
-                    "maps_url": "${data.maps_url}",
-                    "salon_latitude": "${data.salon_latitude}",
-                    "salon_longitude": "${data.salon_longitude}",
-                    "service_blob": "${data.service_blob}",
-                    "category_id": "${data.category_id}",
-                    "service_item": "${form.service_item}"
-                  }
-                }
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": "MORE_SERVICES",
-      "title": "Green Trends",
-      "data": {
-        "customer_name": { "type": "string", "__example__": "Aarthi Kumar" },
-        "customer_mobile": { "type": "string", "__example__": "919876543210" },
-        "customer_email": { "type": "string", "__example__": "" },
-        "gender": { "type": "string", "__example__": "female" },
-        "salon_id": { "type": "string", "__example__": "salon_korattur" },
-        "salon_name": { "type": "string", "__example__": "Green Trends - Korattur" },
-        "salon_address_line": {
-          "type": "string",
-          "__example__": "Korattur, Chennai · Chennai · 600080"
-        },
-        "maps_url": { "type": "string", "__example__": "https://maps.google.com/" },
-        "salon_latitude": { "type": "string", "__example__": "13.1139" },
-        "salon_longitude": { "type": "string", "__example__": "80.1856" },
-        "service_blob": { "type": "string", "__example__": "f_hair_spa||Loreal Hair Spa Medium" },
-        "services_pretty": {
-          "type": "string",
-          "__example__": "Hair Spa & Treatment — Loreal Hair Spa Medium"
-        },
-        "add_more_options": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": { "type": "string" },
-              "title": { "type": "string" }
-            }
-          },
-          "__example__": [{ "id": "yes", "title": "Yes" }]
-        }
-      },
-      "layout": {
-        "type": "SingleColumnLayout",
-        "children": [
-          {
-            "type": "Form",
-            "name": "more_form",
-            "children": [
-              { "type": "TextBody", "text": "UNISEX HAIR & STYLE SALON" },
-              { "type": "TextHeading", "text": "Step 4/7 — Add more services?" },
-              { "type": "TextBody", "text": "Selected so far:" },
-              { "type": "TextBody", "text": "${data.services_pretty}" },
-              {
-                "type": "RadioButtonsGroup",
-                "name": "add_more",
-                "label": "Add another service?",
-                "required": true,
-                "data-source": "${data.add_more_options}"
-              },
-              {
-                "type": "Footer",
-                "label": "Continue",
-                "on-click-action": {
-                  "name": "data_exchange",
-                  "payload": {
-                    "customer_name": "${data.customer_name}",
-                    "customer_mobile": "${data.customer_mobile}",
-                    "customer_email": "${data.customer_email}",
-                    "gender": "${data.gender}",
-                    "salon_id": "${data.salon_id}",
-                    "salon_name": "${data.salon_name}",
-                    "salon_address_line": "${data.salon_address_line}",
-                    "maps_url": "${data.maps_url}",
-                    "salon_latitude": "${data.salon_latitude}",
-                    "salon_longitude": "${data.salon_longitude}",
-                    "service_blob": "${data.service_blob}",
-                    "services_pretty": "${data.services_pretty}",
-                    "add_more": "${form.add_more}"
+                    "selected_categories": "${form.selected_categories}"
                   }
                 }
               }
@@ -365,6 +211,17 @@
             }
           },
           "__example__": [{ "id": "none", "title": "No Preference" }]
+        },
+        "slot_options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" }
+            }
+          },
+          "__example__": [{ "id": "04:30 PM", "title": "04:30 PM" }]
         }
       },
       "layout": {
@@ -375,7 +232,7 @@
             "name": "date_stylist_form",
             "children": [
               { "type": "TextBody", "text": "UNISEX HAIR & STYLE SALON" },
-              { "type": "TextHeading", "text": "Step 5/7 — Date & stylist" },
+              { "type": "TextBody", "text": "Step 3/5 — Date & stylist" },
               { "type": "TextBody", "text": "${data.salon_name}" },
               {
                 "type": "DatePicker",
@@ -427,10 +284,7 @@
         "customer_email": { "type": "string", "__example__": "" },
         "salon_id": { "type": "string", "__example__": "salon_korattur" },
         "salon_name": { "type": "string", "__example__": "Green Trends - Korattur" },
-        "salon_address_line": {
-          "type": "string",
-          "__example__": "Korattur, Chennai · Chennai · 600080"
-        },
+        "salon_address_line": { "type": "string", "__example__": "Korattur, Chennai · Chennai · 600080" },
         "maps_url": { "type": "string", "__example__": "https://maps.google.com/" },
         "salon_latitude": { "type": "string", "__example__": "13.1139" },
         "salon_longitude": { "type": "string", "__example__": "80.1856" },
@@ -460,21 +314,19 @@
             "name": "slot_form",
             "children": [
               { "type": "TextBody", "text": "UNISEX HAIR & STYLE SALON" },
-              { "type": "TextHeading", "text": "Step 6/7 — Pick a time slot" },
-              {
-                "type": "TextBody",
-                "text": "Slots are sample availability. Final time is confirmed by the salon."
-              },
+              { "type": "TextBody", "text": "Step 4/5 — Pick available slot" },
+              { "type": "TextBody", "text": "Selected stylist:" },
+              { "type": "TextBody", "text": "${data.stylist_name}" },
               {
                 "type": "Dropdown",
                 "name": "slot_id",
-                "label": "Available slot",
+                "label": "Available slots",
                 "required": true,
                 "data-source": "${data.slot_options}"
               },
               {
                 "type": "Footer",
-                "label": "Review",
+                "label": "Next",
                 "on-click-action": {
                   "name": "data_exchange",
                   "payload": {
@@ -536,7 +388,7 @@
             "name": "review_form",
             "children": [
               { "type": "TextBody", "text": "UNISEX HAIR & STYLE SALON" },
-              { "type": "TextHeading", "text": "Step 7/7 — Confirm booking" },
+              { "type": "TextBody", "text": "Step 5/5 — Confirm booking" },
               { "type": "TextBody", "text": "${data.review_summary}" },
               {
                 "type": "TextBody",

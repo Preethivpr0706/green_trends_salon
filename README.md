@@ -6,9 +6,9 @@ This project provides a **WhatsApp-first booking flow** that mirrors the Green T
 2. Location (pincode or lat/long)  
 3. Nearest salon selection  
 4. Gender  
-5. Service category and service item  
-6. Date  
-7. Stylist preference (with **No Preference**)  
+5. Service category  
+6. Add additional categories (optional)  
+7. Date + stylist preference (with **No Preference**)  
 8. Slot selection  
 9. Confirmation
 
@@ -27,8 +27,8 @@ POS integration is intentionally skipped for now, as requested.
 - `src/flowHandlers.js`  
   Dynamic data provider for salons, categories, services, stylists, and slots.
 
-- `src/bookingEngine.js` + `src/mockData.js`  
-  Phase 1 business logic and mock salon/service data.
+- `src/bookingEngine.js` + `src/gtlApi.js`  
+  Booking logic and external GTL API integration (store/category/stylist/slot/booking).
 
 - `src/whatsapp.js`  
   WhatsApp Cloud API senders for text, image, interactive flow, and confirmation.
@@ -41,7 +41,7 @@ POS integration is intentionally skipped for now, as requested.
    - `npm install`
 2. Create env:
    - Copy `.env.example` to `.env`
-   - Fill all values
+   - Fill all values (WhatsApp + GTL API settings)
 3. Start server:
    - `npm run dev`
 4. Configure Meta webhook:
@@ -68,28 +68,30 @@ If rejected, you can call `sendBookingRejected()` with alternate slot options.
 
 ---
 
+## GTL API Configuration
+
+The booking flow is API-first and uses GTL endpoints for search + booking.
+
+- `GTL_API_BASE_URL` (default: `https://gtlvl.innosmarti.com`)
+- `GTL_ORG_ID` (default: `1001`)
+- `GTL_BRAND_ID` (default: `1`)
+- `GTL_API_COOKIE` (optional, but often required in practice for session-backed APIs)
+
+APIs wired in code:
+
+- `POST /api/storedetailsforapt` (lat/long and pincode variants)
+- `POST /api/getappointmentcategory`
+- `POST /api/getemployeeforappointment`
+- `POST /api/getemployeeforappointmentslot`
+- `POST /api/addToCalendar`
+
 ## Notes for Production Hardening
 
 - Add signature validation using `APP_SECRET`.
-- Persistence now uses MySQL tables: `salons`, `users`, and `appointments`.
-- Chennai salon branches are seeded into `salons` automatically on first startup when the table is empty.
-- Local JSON state file is still used for `onboarding` and `flowSessions` (`./data/state.json` by default, configurable via `DB_STATE_PATH`).
+- Booking/search/category/stylist/slot data is fetched from GTL APIs.
+- Local runtime storage is in-memory for onboarding/flow sessions/fallback booking visibility.
+- Add durable persistence if historical reporting is required across restarts.
 - Debug endpoints available: `GET /internal/users`, `GET /internal/appointments`, and `GET /internal/bookings`.
-- Set MySQL envs: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`.
-- Replace mock availability with real-time inventory engine.
+- Keep `GTL_API_COOKIE` fresh if upstream enforces session cookies.
 - Add approved media assets (brand banners) hosted on CDN.
 - Add language personalization (English/Tamil) if needed for promotions.
-
----
-
-## Geocode salon coordinates
-
-To improve nearest-salon ranking accuracy, geocode all salon addresses into `salons.lat/lng`.
-
-1. Ensure MySQL envs are set in `.env` (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`).
-2. Run:
-   - `npm run geocode-salons`
-3. Optional tuning envs:
-   - `GEOCODE_FORCE=true` (re-geocode all rows)
-   - `GEOCODE_LIMIT=20` (process first 20)
-   - `GEOCODE_DELAY_MS=1200` (request spacing for API friendliness)
