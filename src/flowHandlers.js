@@ -74,7 +74,11 @@ function normalizeTimeForApi(value) {
 }
 
 function todayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 function isPastDate(value) {
@@ -84,7 +88,10 @@ function isPastDate(value) {
 }
 
 function timeStringToMinutes(value) {
-  const m = String(value || "")
+  const base = String(value || "")
+    .split("-")[0]
+    .trim();
+  const m = base
     .trim()
     .match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/);
   if (!m) return null;
@@ -121,12 +128,8 @@ async function buildReviewScreenData(incoming, session) {
     formatServicesPrettyFromBlob(blob) || String(d.service_item_pretty || "");
 
   let stylist_name = "";
-  if (!d.stylist_id || d.stylist_id === "none") {
-    stylist_name = "No Preference";
-  } else {
-    stylist_name =
-      (await stylistDisplayName(d.salon_id, d.stylist_id, d.gender)) || String(d.stylist_name || "");
-  }
+  stylist_name =
+    (await stylistDisplayName(d.salon_id, d.stylist_id, d.gender)) || String(d.stylist_name || "");
 
   const salon_name = String(salon?.name || d.salon_name || "");
   const maps_url = String(salon?.mapsUrl || d.maps_url || "");
@@ -290,7 +293,7 @@ export async function handleFlowDataExchange(reqBody) {
     }
     const services_pretty = formatServicesPrettyFromBlob(newBlob);
     const sal = getSalonByIdFromCache(merged.salon_id);
-    let stylistList = [{ id: "none", name: "No Preference" }];
+    let stylistList = [];
     try {
       stylistList = await getStylistsByGender(merged.salon_id, merged.gender, merged.booking_date);
     } catch (err) {
@@ -341,10 +344,7 @@ export async function handleFlowDataExchange(reqBody) {
       };
     }
     const sal = getSalonByIdFromCache(merged.salon_id);
-    const stylist_name =
-      !merged.stylist_id || merged.stylist_id === "none"
-        ? "No Preference"
-        : await stylistDisplayName(merged.salon_id, merged.stylist_id, merged.gender);
+    const stylist_name = await stylistDisplayName(merged.salon_id, merged.stylist_id, merged.gender);
     const slots = await fetchSlots({
       storeId: merged.salon_id,
       aptDate: merged.booking_date,
@@ -399,10 +399,7 @@ export async function handleFlowDataExchange(reqBody) {
     const selectedSalon =
       getSalonByIdFromCache(d.salon_id) ||
       (session.salons || []).find((s) => s.id === d.salon_id);
-    const resolvedStylist =
-      !d.stylist_id || d.stylist_id === "none"
-        ? "No Preference"
-        : d.stylist_name || (await stylistDisplayName(d.salon_id, d.stylist_id, d.gender));
+    const resolvedStylist = d.stylist_name || (await stylistDisplayName(d.salon_id, d.stylist_id, d.gender));
 
     const parts = parseServiceBlobParts(d.service_blob);
     const primary = parts[0] ? parseServiceOptionId(parts[0]) : { service_category: "", service_item: "" };
@@ -437,7 +434,7 @@ export async function handleFlowDataExchange(reqBody) {
         service: formatServicesPrettyFromBlob(d.service_blob) || d.service_item_pretty || "",
         selectedDate: d.booking_date,
         time: normalizeTimeForApi(d.slot_id),
-        id: d.stylist_id === "none" ? "" : String(d.stylist_id || "")
+        id: String(d.stylist_id || "")
       };
       console.log("[flow] addToCalendar request payload", addToCalendarPayload);
       const addToCalendarResponse = await createAppointment(addToCalendarPayload);

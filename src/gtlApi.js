@@ -171,18 +171,15 @@ export async function fetchStylists({ storeId, aptDate, gender }) {
     })
   );
   console.log("[gtlApi] stylists", rows);
-  return [
-    { id: "none", name: "No Preference" },
-    ...rows
-      .map((r) => {
-        const id = String(r?.EmpID ?? r?.empid ?? r?.id ?? "").trim();
-        const name = String(r?.Employee ?? r?.FirstName ?? r?.text ?? "").trim();
-        const designation = String(r?.DesignationName ?? r?.designation ?? "").trim();
-        const displayTitle = designation ? `${name} — ${designation}` : name;
-        return id && name ? { id, name, designation, displayTitle } : null;
-      })
-      .filter(Boolean)
-  ];
+  return rows
+    .map((r) => {
+      const id = String(r?.EmpID ?? r?.empid ?? r?.id ?? "").trim();
+      const name = String(r?.Employee ?? r?.FirstName ?? r?.text ?? "").trim();
+      const designation = String(r?.DesignationName ?? r?.designation ?? "").trim();
+      const displayTitle = designation ? `${name} — ${designation}` : name;
+      return id && name ? { id, name, designation, displayTitle } : null;
+    })
+    .filter(Boolean);
 }
 
 function formatTimeSlot(start, end) {
@@ -216,7 +213,7 @@ export async function fetchSlots({ storeId, aptDate, empId }) {
     StoreID: Number(storeId),
     OrganisationID: config.gtlOrgId,
     AptDate: aptDate,
-    EmpID: empId === "none" ? "" : String(empId || "")
+    EmpID: String(empId || "")
   });
   console.log("[gtlApi] slot raw response", raw);
   const rows = asArray(raw);
