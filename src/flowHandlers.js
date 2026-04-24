@@ -73,6 +73,46 @@ function normalizeTimeForApi(value) {
   return `${String(hh).padStart(2, "0")}:${mm}`;
 }
 
+function todayIsoDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function isPastDate(value) {
+  const selected = String(value || "").trim();
+  if (!selected) return false;
+  return selected < todayIsoDate();
+}
+
+function timeStringToMinutes(value) {
+  const m = String(value || "")
+    .trim()
+    .match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/);
+  if (!m) return null;
+  let hour = Number(m[1]);
+  const minute = Number(m[2]);
+  const meridiem = m[3].toUpperCase();
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+  if (hour < 1 || hour > 12 || minute < 0 || minute > 59) return null;
+  if (meridiem === "PM" && hour !== 12) hour += 12;
+  if (meridiem === "AM" && hour === 12) hour = 0;
+  return hour * 60 + minute;
+}
+
+function filterSlotsFromCurrentTime(slots, bookingDate) {
+  const selected = String(bookingDate || "").trim();
+  if (!selected || selected !== todayIsoDate()) {
+    return Array.isArray(slots) ? slots : [];
+  }
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const slotList = Array.isArray(slots) ? slots : [];
+  return slotList.filter((slot) => {
+    const raw = typeof slot === "string" ? slot : slot?.id || slot?.title;
+    const slotMinutes = timeStringToMinutes(raw);
+    return slotMinutes != null && slotMinutes > nowMinutes;
+  });
+}
+
 async function buildReviewScreenData(incoming, session) {
   const d = { ...session, ...incoming };
   const salon = getSalonByIdFromCache(d.salon_id);
@@ -167,7 +207,8 @@ export async function handleFlowDataExchange(reqBody) {
         salon_address_line: initData.salon_address_line || "",
         maps_url: initData.maps_url || "",
         salon_latitude: initData.salon_latitude || "",
-        salon_longitude: initData.salon_longitude || ""
+        salon_longitude: initData.salon_longitude || "",
+        min_booking_date: todayIsoDate()
       }
     };
   }
@@ -278,6 +319,7 @@ export async function handleFlowDataExchange(reqBody) {
         salon_longitude: sal ? String(sal.lng) : nextSession.salon_longitude || "",
         service_blob: newBlob,
         services_pretty,
+        min_booking_date: todayIsoDate(),
         stylist_options: stylistList.map((s) => ({ id: s.id, title: s.displayTitle || s.name }))
       }
     };
@@ -285,6 +327,19 @@ export async function handleFlowDataExchange(reqBody) {
 
   if (screen === "DATE_STYLIST" && act === "data_exchange") {
     const merged = { ...session, ...data };
+    if (isPastDate(merged.booking_date)) {
+      const reloadedStylists = await getStylistsByGender(merged.salon_id, merged.gender, todayIsoDate());
+      return {
+        ...v,
+        screen: "DATE_STYLIST",
+        data: {
+          ...merged,
+          min_booking_date: todayIsoDate(),
+          booking_date: todayIsoDate(),
+          stylist_options: reloadedStylists.map((s) => ({ id: s.id, title: s.displayTitle || s.name }))
+        }
+      };
+    }
     const sal = getSalonByIdFromCache(merged.salon_id);
     const stylist_name =
       !merged.stylist_id || merged.stylist_id === "none"
@@ -295,6 +350,7 @@ export async function handleFlowDataExchange(reqBody) {
       aptDate: merged.booking_date,
       empId: merged.stylist_id
     });
+    const filteredSlots = filterSlotsFromCurrentTime(slots, merged.booking_date);
 
     const nextSession = mergeAndSaveSession(flowToken, session, {
       ...merged,
@@ -322,7 +378,7 @@ export async function handleFlowDataExchange(reqBody) {
         booking_date: nextSession.booking_date,
         stylist_id: nextSession.stylist_id,
         stylist_name,
-        slot_options: slots
+        slot_options: filteredSlots
       }
     };
   }

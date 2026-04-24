@@ -29,7 +29,7 @@ export function parseNfmReplyPayload(msg) {
 
 export function formatBookingSummaryFromFlow(data) {
   if (!data || typeof data !== "object") {
-    return "Thank you — we received your Green Trends booking request.";
+    return "Thank you — your appointment is not booked yet. We received your booking request and will contact you shortly.";
   }
 
   const name = data.customer_name || "Customer";
@@ -45,13 +45,13 @@ export function formatBookingSummaryFromFlow(data) {
   const stylist = data.stylist_name || data.stylist_id || "—";
   const bookingId = data.booking_id || (data.flow_token ? `GT-FLOW-${data.flow_token}` : "—");
   const lines = [
-    `✅ *Green Trends — Booking Confirmed*`,
+    `✅ *Green Trends — Booking Request Received*`,
     ``,
     `Hello ${name} 👋`,
     ``,
-    `Your appointment has been booked successfully.`,
+    `Your appointment is not booked yet.`,
     ``,
-    `Please review your appointment details below:`,
+    `Your booking request has been received. We will contact you shortly.`,
     ``,
     `*Salon:* ${salon}`,
     ``,
@@ -65,12 +65,12 @@ export function formatBookingSummaryFromFlow(data) {
     ``,
     `👩‍🔧 *Stylist:* ${stylist}`,
     ``,
-    `🆔 *Booking ID:* ${bookingId}`
+    `🆔 *Request ID:* ${bookingId}`
   ];
 
   lines.push(
     ``,
-    `Our team will confirm your slot shortly. Thank you for your patience.`,
+    `Our team will contact you shortly to confirm your slot. Thank you for your patience.`,
     ``,
     `_💚 Green Trends — Unisex Hair & Style Salon_`
   );
