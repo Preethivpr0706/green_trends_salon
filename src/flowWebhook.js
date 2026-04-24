@@ -29,7 +29,7 @@ export function parseNfmReplyPayload(msg) {
 
 export function formatBookingSummaryFromFlow(data) {
   if (!data || typeof data !== "object") {
-    return "Thank you — your appointment is not booked yet. We received your booking request and will contact you shortly.";
+    return "Thank you. We received your booking request and will contact you shortly.";
   }
 
   const name = data.customer_name || "Customer";
@@ -48,8 +48,6 @@ export function formatBookingSummaryFromFlow(data) {
     `✅ *Green Trends — Booking Request Received*`,
     ``,
     `Hello ${name} 👋`,
-    ``,
-    `Your appointment is not booked yet.`,
     ``,
     `Your booking request has been received. We will contact you shortly.`,
     ``,
