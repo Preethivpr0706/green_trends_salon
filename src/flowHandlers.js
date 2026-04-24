@@ -73,16 +73,41 @@ function normalizeTimeForApi(value) {
   return `${String(hh).padStart(2, "0")}:${mm}`;
 }
 
+const BOOKING_TIME_ZONE = "Asia/Kolkata";
+
+function getZonedNowParts(timeZone = BOOKING_TIME_ZONE) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).formatToParts(new Date());
+  const pick = (type) => parts.find((p) => p.type === type)?.value || "";
+  return {
+    year: pick("year"),
+    month: pick("month"),
+    day: pick("day"),
+    hour: pick("hour"),
+    minute: pick("minute")
+  };
+}
+
+function normalizeDateOnly(value) {
+  const s = String(value || "").trim();
+  if (!s) return "";
+  return s.slice(0, 10);
+}
+
 function todayIsoDate() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  const now = getZonedNowParts();
+  return `${now.year}-${now.month}-${now.day}`;
 }
 
 function isPastDate(value) {
-  const selected = String(value || "").trim();
+  const selected = normalizeDateOnly(value);
   if (!selected) return false;
   return selected < todayIsoDate();
 }
@@ -106,12 +131,12 @@ function timeStringToMinutes(value) {
 }
 
 function filterSlotsFromCurrentTime(slots, bookingDate) {
-  const selected = String(bookingDate || "").trim();
+  const selected = normalizeDateOnly(bookingDate);
   if (!selected || selected !== todayIsoDate()) {
     return Array.isArray(slots) ? slots : [];
   }
-  const now = new Date();
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const now = getZonedNowParts();
+  const nowMinutes = Number(now.hour) * 60 + Number(now.minute);
   const slotList = Array.isArray(slots) ? slots : [];
   return slotList.filter((slot) => {
     const raw = typeof slot === "string" ? slot : slot?.id || slot?.title;
