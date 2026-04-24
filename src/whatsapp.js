@@ -110,7 +110,7 @@ export async function sendSalonListMessage(to, salonRows, headerText) {
       type: "list",
       header: { type: "text", text: headerText || "Nearby salons ✨" },
       body: {
-        text: "Tap a salon to book — address is shown on each row. You can pick gender & services next."
+        text: "Tap a salon to book."
       },
       footer: { text: "Green Trends" },
       action: {
