@@ -185,6 +185,7 @@ export async function sendBookingConfirmed(to, booking) {
   const stylistName = booking.stylistName === "No Preference"
     ? "Auto Assigned Stylist"
     : booking.stylistName;
+  const mapsLine = booking.mapsUrl ? `*Location:* ${booking.mapsUrl}` : null;
 
   return sendText(
     to,
@@ -195,8 +196,9 @@ export async function sendBookingConfirmed(to, booking) {
       `*Date:* ${booking.date || "-"}`,
       `*Time:* ${booking.timeSlot || "-"}`,
       `*Stylist:* ${stylistName || "-"}`,
+      ...(mapsLine ? [mapsLine] : []),
       "",
-      "We will share the location pin separately in chat. 💚"
+      "We look forward to welcoming you. 💚"
     ].join("\n")
   );
 }

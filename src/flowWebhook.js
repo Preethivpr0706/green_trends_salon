@@ -45,11 +45,13 @@ export function formatBookingSummaryFromFlow(data) {
   const stylist = data.stylist_name || data.stylist_id || "—";
   const bookingId = data.booking_id || (data.flow_token ? `GT-FLOW-${data.flow_token}` : "—");
   const lines = [
-    `✅ *Green Trends — Booking Request Submitted*`,
+    `✅ *Green Trends — Booking Confirmed*`,
     ``,
     `Hello ${name} 👋`,
     ``,
-    `Thank you for choosing Green Trends. Please review your appointment details below:`,
+    `Your appointment has been booked successfully.`,
+    ``,
+    `Please review your appointment details below:`,
     ``,
     `*Salon:* ${salon}`,
     ``,
