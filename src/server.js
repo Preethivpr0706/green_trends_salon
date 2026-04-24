@@ -214,6 +214,9 @@ We are glad you are here! Next we will find salons near you.`;
     logWebhookError("welcome image (set PUBLIC_BASE_URL or WELCOME_IMAGE_URL)", imgErr);
   }
 
+  // Keep a deterministic UX order: welcome first, then actions after a short gap.
+  await delay(2000);
+
   try {
     await sendWelcomeActionButtons(from);
     logWebhook("send", "welcome action buttons OK");

@@ -45,22 +45,24 @@ export function formatBookingSummaryFromFlow(data) {
   const stylist = data.stylist_name || data.stylist_id || "—";
   const bookingId = data.booking_id || (data.flow_token ? `GT-FLOW-${data.flow_token}` : "—");
   const lines = [
-    `✅ *Green Trends — Booking Received*`,
+    `✅ *Green Trends — Appointment Request Received*`,
     ``,
-    `Hi ${name} 👋`,
+    `Hello ${name} 👋`,
     ``,
-    `Your appointment request has been captured with these details:`,
+    `Thank you for choosing Green Trends. Please review your appointment details below:`,
     ``,
     `*Salon:* ${salon}`,
     ...(data.salon_address_line ? [`*Address:* ${data.salon_address_line}`] : []),
-    `*Services:* ${service}`,
-    `*Date:* ${when}`,
-    `*Time:* ${time}`,
-    `*Stylist:* ${stylist}`,
-    `*Booking ID:* ${bookingId}`
+    `💇 *Services:* ${service}`,
+    `📅 *Date:* ${when}`,
+    `⏰ *Time:* ${time}`,
+    `👩‍🔧 *Stylist:* ${stylist}`,
+    `🆔 *Booking ID:* ${bookingId}`
   ];
 
   lines.push(
+    ``,
+    `Our team will confirm your slot shortly. Thank you for your patience.`,
     ``,
     `_💚 Green Trends — Unisex Hair & Style Salon_`
   );

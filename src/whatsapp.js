@@ -158,10 +158,10 @@ export async function sendBookingFlow(to, initialData = {}, flowToken = "") {
         text: "Green Trends Appointment Booking"
       },
       body: {
-        text: "✨ Tap below to pick services, date & time — we will confirm with the salon."
+        text: "Tap below to pick service."
       },
       footer: {
-        text: "COCO & FOFO booking assistant"
+        text: "Green Trends"
       },
       action: {
         name: "flow",
