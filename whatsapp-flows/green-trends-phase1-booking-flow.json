@@ -201,6 +201,7 @@
         "gender": { "type": "string", "__example__": "female" },
         "service_blob": { "type": "string", "__example__": "" },
         "services_pretty": { "type": "string", "__example__": "" },
+        "min_booking_date": { "type": "string", "__example__": "2026-04-24" },
         "stylist_options": {
           "type": "array",
           "items": {
@@ -238,7 +239,8 @@
                 "type": "DatePicker",
                 "name": "booking_date",
                 "label": "Appointment date",
-                "required": true
+                "required": true,
+                "min-date": "${data.min_booking_date}"
               },
               {
                 "type": "Dropdown",
