@@ -61,9 +61,7 @@ export function formatBookingSummaryFromFlow(data) {
     ``,
     `⏰ *Time:* ${time}`,
     ``,
-    `👩‍🔧 *Stylist:* ${stylist}`,
-    ``,
-    `🆔 *Request ID:* ${bookingId}`
+    `👩‍🔧 *Stylist:* ${stylist}`
   ];
 
   lines.push(
