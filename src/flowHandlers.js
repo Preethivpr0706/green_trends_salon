@@ -73,6 +73,11 @@ function normalizeTimeForApi(value) {
   return `${String(hh).padStart(2, "0")}:${mm}`;
 }
 
+function normalizeMobileForApi(value) {
+  const digits = String(value || "").replace(/\D+/g, "");
+  return digits;
+}
+
 const BOOKING_TIME_ZONE = "Asia/Kolkata";
 
 function getZonedNowParts(timeZone = BOOKING_TIME_ZONE) {
@@ -453,7 +458,7 @@ export async function handleFlowDataExchange(reqBody) {
         orgid: config.gtlOrgId,
         name: d.customer_name,
         email: d.customer_email || "",
-        mobile: d.customer_mobile,
+        mobile: normalizeMobileForApi(d.customer_mobile),
         genderid: String(d.gender || "").toLowerCase() === "male" ? 1 : 2,
         notes: "Booked via WhatsApp",
         service: formatServicesPrettyFromBlob(d.service_blob) || d.service_item_pretty || "",

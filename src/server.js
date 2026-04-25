@@ -97,7 +97,7 @@ async function handleFlowCompletion(msg) {
 
     const fallbackBooking = createPendingBooking({
       fullName: payload.customer_name || "",
-      mobile: payload.customer_mobile || from || "",
+      mobile: normalizeMobileForApi(payload.customer_mobile || from || ""),
       email: payload.customer_email || "",
       salonId: payload.salon_id || "",
       salonName: payload.salon_name || "",
@@ -193,6 +193,10 @@ function normalizeTimeForApi(value) {
     if (meridiem === "AM" && hh === 12) hh = 0;
   }
   return `${String(hh).padStart(2, "0")}:${mm}`;
+}
+
+function normalizeMobileForApi(value) {
+  return String(value || "").replace(/\D+/g, "");
 }
 
 /** Hi → welcome image first, then native location request + pincode hint (Flow opens after list pick). */
