@@ -117,9 +117,9 @@ async function handleFlowCompletion(msg) {
     const addToCalendarPayload = {
       storeid: Number(payload.salon_id || 0),
       orgid: config.gtlOrgId,
-      name: payload.customer_name || "",
+      name: sanitizeNameForApi(payload.customer_name || ""),
       email: payload.customer_email || "",
-      mobile: payload.customer_mobile || from || "",
+      mobile: normalizeMobileForApi(payload.customer_mobile || from || ""),
       genderid: String(payload.gender || "").toLowerCase() === "male" ? 1 : 2,
       notes: "Booked via WhatsApp",
       service: servicePretty,
@@ -196,7 +196,19 @@ function normalizeTimeForApi(value) {
 }
 
 function normalizeMobileForApi(value) {
-  return String(value || "").replace(/\D+/g, "");
+  const digits = String(value || "").replace(/\D+/g, "");
+  if (digits.length === 10) return `91${digits}`;
+  if (digits.length === 11 && digits.startsWith("0")) return `91${digits.slice(1)}`;
+  if (digits.length === 12 && digits.startsWith("91")) return digits;
+  return digits;
+}
+
+function sanitizeNameForApi(value) {
+  const cleaned = String(value || "")
+    .replace(/[^\p{L}\p{M}\p{N}\s.'-]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || "Customer";
 }
 
 /** Hi → welcome image first, then native location request + pincode hint (Flow opens after list pick). */

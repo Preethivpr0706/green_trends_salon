@@ -252,7 +252,13 @@ export async function fetchSlots({ storeId, aptDate, empId }) {
 }
 
 export async function createAppointment(payload) {
-  return postJson("/api/addToCalendar", payload);
+  const response = await postJson("/api/addToCalendar", payload);
+  const result = String(response?.result || response?.status || "").toLowerCase();
+  if (result === "error") {
+    const message = String(response?.message || "unknown addToCalendar error");
+    throw new Error(`addToCalendar rejected: ${message}`);
+  }
+  return response;
 }
 
 export function getSalonFromCache(salonId) {

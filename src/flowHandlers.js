@@ -75,7 +75,18 @@ function normalizeTimeForApi(value) {
 
 function normalizeMobileForApi(value) {
   const digits = String(value || "").replace(/\D+/g, "");
+  if (digits.length === 10) return `91${digits}`;
+  if (digits.length === 11 && digits.startsWith("0")) return `91${digits.slice(1)}`;
+  if (digits.length === 12 && digits.startsWith("91")) return digits;
   return digits;
+}
+
+function sanitizeNameForApi(value) {
+  const cleaned = String(value || "")
+    .replace(/[^\p{L}\p{M}\p{N}\s.'-]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || "Customer";
 }
 
 const BOOKING_TIME_ZONE = "Asia/Kolkata";
@@ -456,7 +467,7 @@ export async function handleFlowDataExchange(reqBody) {
       const addToCalendarPayload = {
         storeid: Number(d.salon_id),
         orgid: config.gtlOrgId,
-        name: d.customer_name,
+        name: sanitizeNameForApi(d.customer_name),
         email: d.customer_email || "",
         mobile: normalizeMobileForApi(d.customer_mobile),
         genderid: String(d.gender || "").toLowerCase() === "male" ? 1 : 2,
