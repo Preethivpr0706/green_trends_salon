@@ -33,6 +33,7 @@ import {
   sendBookingFlow,
   sendFlowCompletionSummary,
   sendImage,
+  sendLocationInputOptionsList,
   sendLocationMessage,
   sendLocationRequestMessage,
   sendSalonListMessage,
@@ -247,25 +248,17 @@ We are glad you are here! Next we will find salons near you.`;
 async function startBookingLocationFlow(from) {
   await delay(300);
   try {
-    await sendLocationRequestMessage(from);
-    logWebhook("send", "location_request_message OK");
+    await sendLocationInputOptionsList(from);
+    logWebhook("send", "location input options list OK");
   } catch (e) {
-    logWebhookError("location_request_message (fallback text)", e);
+    logWebhookError("location_input_options_list", e);
     await sendText(
       from,
-      "📍 Tap 📎 → *Location* → send your current location so we can list nearby Green Trends salons."
+      "Choose one: *Live Location*, *Pincode*, or *City* to find nearby salons."
     );
   }
 
-  await delay(300);
-  try {
-    await sendText(from, "✏️ Or type your *area pincode* or *city name* here (e.g. 600080 or Chennai).");
-    logWebhook("send", "pincode hint OK");
-  } catch (e) {
-    logWebhookError("pincode hint", e);
-  }
-
-  setOnboarding(from, { phase: PHASE.AWAITING_PIN_OR_LOCATION });
+  setOnboarding(from, { phase: PHASE.AWAITING_LOCATION_INPUT_PICK, location_input_mode: "" });
 }
 
 function cleanProfileName(value) {
@@ -352,6 +345,45 @@ async function handleSalonListReply(msg) {
   const from = msg.from;
   if (!from) return;
   const { phase } = getOnboarding(from);
+  if (phase === PHASE.AWAITING_LOCATION_INPUT_PICK) {
+    const selectionId = msg.interactive?.list_reply?.id;
+    if (!selectionId) return;
+
+    if (selectionId === "loc_mode_live") {
+      try {
+        await sendLocationRequestMessage(
+          from,
+          "📍 Great choice. Tap *Send location* below to share your current location."
+        );
+        await sendText(from, "If needed, you can still type your pincode or city here.");
+      } catch (e) {
+        logWebhookError("location_request_message after mode pick", e);
+        await sendText(
+          from,
+          "📍 Tap 📎 → *Location* → send your current location so we can list nearby salons."
+        );
+      }
+      setOnboarding(from, { phase: PHASE.AWAITING_PIN_OR_LOCATION, location_input_mode: "live" });
+      return;
+    }
+
+    if (selectionId === "loc_mode_pincode") {
+      await sendText(from, "✏️ Please type your *6-digit pincode* (example: 600080).");
+      setOnboarding(from, { phase: PHASE.AWAITING_PIN_OR_LOCATION, location_input_mode: "pincode" });
+      return;
+    }
+
+    if (selectionId === "loc_mode_city") {
+      await sendText(from, "🏙️ Please type your *city or area name* (example: Chennai / T Nagar).");
+      setOnboarding(from, { phase: PHASE.AWAITING_PIN_OR_LOCATION, location_input_mode: "city" });
+      return;
+    }
+
+    await sendText(from, "Please choose a valid location option from the list.");
+    await startBookingLocationFlow(from);
+    return;
+  }
+
   if (phase !== PHASE.AWAITING_SALON_PICK) {
     logWebhook("list_reply", `ignored — phase=${phase}`);
     return;
@@ -420,6 +452,12 @@ async function handleInboundText(msg) {
     return;
   }
 
+  if (phase === PHASE.AWAITING_LOCATION_INPUT_PICK) {
+    await sendText(from, "👆 Please pick one option from the list: *Live Location*, *Pincode*, or *City*.");
+    await startBookingLocationFlow(from);
+    return;
+  }
+
   if (phase === PHASE.AWAITING_SALON_PICK) {
     if (looksLikeLocationSearchText(text)) {
       const nearby = await getNearestSalons({ searchText: text.trim() });
@@ -435,6 +473,20 @@ async function handleInboundText(msg) {
   }
 
   if (phase === PHASE.AWAITING_PIN_OR_LOCATION) {
+    const locationMode = String(getOnboarding(from).location_input_mode || "");
+    if (locationMode === "pincode") {
+      if (!/^\d{6}$/.test(text.trim())) {
+        await sendText(from, "📌 Please enter a valid *6-digit pincode* (example: 600017).");
+        return;
+      }
+    }
+    if (locationMode === "city") {
+      const cityText = text.trim();
+      if (!cityText || /^\d{6}$/.test(cityText)) {
+        await sendText(from, "🏙️ Please enter a *city/area name* (example: Chennai / Anna Nagar).");
+        return;
+      }
+    }
     if (looksLikeLocationSearchText(text)) {
       const nearby = await getNearestSalons({ searchText: text.trim() });
       logWebhook("search", `${text.trim()} → ${nearby.length} salons`);
@@ -464,7 +516,7 @@ async function handleInboundText(msg) {
 
   await sendText(
     from,
-    "💬 Share your *6-digit pincode* or your *location* to see nearby salons — then use *Book Appointment*. ✨"
+    "💬 Tap *Book Appointment* and choose one option: *Live Location*, *Pincode*, or *City* to find nearby salons. ✨"
   );
 }
 

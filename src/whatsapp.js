@@ -94,6 +94,47 @@ export async function sendLocationRequestMessage(to, bodyText) {
   });
 }
 
+export async function sendLocationInputOptionsList(to) {
+  return sendMessage({
+    messaging_product: "whatsapp",
+    to,
+    type: "interactive",
+    interactive: {
+      type: "list",
+      header: { type: "text", text: "Share your location details 📍" },
+      body: {
+        text: "Choose one option so we can find nearby Green Trends salons."
+      },
+      footer: { text: "Green Trends" },
+      action: {
+        button: "Choose option",
+        sections: [
+          {
+            title: "Location options",
+            rows: [
+              {
+                id: "loc_mode_live",
+                title: "Live Location",
+                description: "Share your current location from WhatsApp"
+              },
+              {
+                id: "loc_mode_pincode",
+                title: "Pincode",
+                description: "Enter your 6-digit area pincode"
+              },
+              {
+                id: "loc_mode_city",
+                title: "City",
+                description: "Type your city/locality name"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  });
+}
+
 /** Interactive list (max 10 rows). Each row id = salon_id. */
 export async function sendSalonListMessage(to, salonRows, headerText) {
   const rows = (salonRows || []).slice(0, 10).map((s) => ({
