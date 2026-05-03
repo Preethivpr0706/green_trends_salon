@@ -19,6 +19,8 @@ export const config = {
   whatsappToken: process.env.WHATSAPP_TOKEN || "",
   phoneNumberId: process.env.PHONE_NUMBER_ID || "",
   flowIdBookAppointment: process.env.FLOW_ID_BOOK_APPOINTMENT || "",
+  /** Publish `whatsapp-flows/green-trends-feedback-flow.json` and set this Flow ID. */
+  flowIdFeedback: process.env.FLOW_ID_FEEDBACK || "",
   appSecret: process.env.APP_SECRET || "",
   gtlApiBaseUrl: process.env.GTL_API_BASE_URL || "https://gtlvl.innosmarti.com",
   gtlOrgId: Number(process.env.GTL_ORG_ID || 1001),

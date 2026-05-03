@@ -20,7 +20,12 @@ import {
 import { createAppointment } from "./gtlApi.js";
 import { decryptFlowRequest, encryptFlowResponse, loadFlowPrivateKeyPem } from "./flowCrypto.js";
 import { handleFlowDataExchange } from "./flowHandlers.js";
-import { formatBookingSummaryFromFlow, parseNfmReplyPayload } from "./flowWebhook.js";
+import {
+  formatBookingSummaryFromFlow,
+  formatFeedbackThankYou,
+  isFeedbackFlowPayload,
+  parseNfmReplyPayload
+} from "./flowWebhook.js";
 import {
   getOnboarding,
   isGreeting,
@@ -31,6 +36,7 @@ import {
 import {
   sendBookingConfirmed,
   sendBookingFlow,
+  sendFeedbackFlow,
   sendFlowCompletionSummary,
   sendImage,
   sendLocationInputOptionsList,
@@ -82,6 +88,16 @@ async function handleFlowCompletion(msg) {
   }
 
   logWebhook("flow_response", `parsed keys=${Object.keys(payload).join(",")}`);
+
+  if (isFeedbackFlowPayload(payload)) {
+    try {
+      await sendText(from, formatFeedbackThankYou(payload));
+      logWebhook("send", "feedback thank-you OK");
+    } catch (e) {
+      logWebhookError("send feedback thank-you", e);
+    }
+    return;
+  }
 
   const summary = formatBookingSummaryFromFlow(payload);
   let addToCalendarSucceeded = false;
@@ -305,6 +321,29 @@ async function presentNearbySalonsOrRetry(from, nearbySalons) {
   }
 }
 
+async function trySendFeedbackFlow(from) {
+  if (!config.flowIdFeedback || config.flowIdFeedback.includes("replace")) {
+    logWebhook(
+      "send feedback flow",
+      "SKIPPED — set FLOW_ID_FEEDBACK in .env to the published Flow ID (WhatsApp Manager → Flows)."
+    );
+    await sendText(
+      from,
+      "⚠️ Feedback form is not configured yet. Please ask your admin to set FLOW_ID_FEEDBACK, or call the salon — we would love to hear from you. 💚"
+    );
+    return;
+  }
+
+  const flowToken = `fb_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+  try {
+    await sendFeedbackFlow(from, flowToken);
+    logWebhook("send", "feedback Flow OK");
+  } catch (e) {
+    logWebhookError("sendFeedbackFlow", e);
+    await sendText(from, "We could not open the feedback form right now. Please try again in a moment. 💚");
+  }
+}
+
 async function sendBookingFlowAfterSalonSelection(from, salon) {
   if (!config.flowIdBookAppointment || config.flowIdBookAppointment.includes("replace")) {
     logWebhook(
@@ -436,6 +475,11 @@ async function handleInboundText(msg) {
   const text = msg.text?.body ?? "";
   const norm = text.trim().toLowerCase();
   const { phase } = getOnboarding(from);
+
+  if (norm.includes("feedback")) {
+    await trySendFeedbackFlow(from);
+    return;
+  }
 
   if (isGreeting(text)) {
     await sendWelcomeImageAndAskLocation(msg);

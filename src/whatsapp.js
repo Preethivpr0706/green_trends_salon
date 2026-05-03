@@ -184,6 +184,47 @@ export async function sendWelcomeActionButtons(to) {
   });
 }
 
+/** Static 2-screen feedback Flow (`whatsapp-flows/green-trends-feedback-flow.json`). */
+export async function sendFeedbackFlow(to, flowToken = "") {
+  if (!config.flowIdFeedback || config.flowIdFeedback.includes("replace")) {
+    throw new Error("FLOW_ID_FEEDBACK is not configured");
+  }
+  const token = String(flowToken || `token_${Date.now()}`);
+
+  return sendMessage({
+    messaging_product: "whatsapp",
+    to,
+    type: "interactive",
+    interactive: {
+      type: "flow",
+      header: {
+        type: "text",
+        text: "Green Trends — Your feedback"
+      },
+      body: {
+        text: "Tap below for a quick 2-step form. It only takes a minute 💚"
+      },
+      footer: {
+        text: "Green Trends"
+      },
+      action: {
+        name: "flow",
+        parameters: {
+          flow_message_version: "3",
+          flow_token: token,
+          flow_id: config.flowIdFeedback,
+          flow_cta: "Share feedback",
+          flow_action: "navigate",
+          flow_action_payload: {
+            screen: "RECOMMEND",
+            data: {}
+          }
+        }
+      }
+    }
+  });
+}
+
 export async function sendBookingFlow(to, initialData = {}, flowToken = "") {
   const data = { ...entryFlowInitialData(), ...initialData };
   const token = String(flowToken || `token_${Date.now()}`);

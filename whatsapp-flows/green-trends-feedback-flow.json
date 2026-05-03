@@ -1,0 +1,196 @@
+{
+  "version": "7.3",
+  "routing_model": {
+    "RECOMMEND": ["RATE"],
+    "RATE": []
+  },
+  "screens": [
+    {
+      "id": "RECOMMEND",
+      "title": "Green Trends — Feedback 1/2",
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "form",
+            "children": [
+              { "type": "TextBody", "text": "UNISEX HAIR & STYLE SALON" },
+              { "type": "TextBody", "text": "We value your visit 💚" },
+              {
+                "type": "TextSubheading",
+                "text": "Would you recommend Green Trends to a friend?"
+              },
+              {
+                "type": "RadioButtonsGroup",
+                "label": "Choose one",
+                "name": "recommend_to_friend",
+                "data-source": [
+                  { "id": "0_Yes", "title": "Yes" },
+                  { "id": "1_No", "title": "No" }
+                ],
+                "required": true
+              },
+              {
+                "type": "TextSubheading",
+                "text": "How can we make your next visit even better?"
+              },
+              {
+                "type": "TextArea",
+                "label": "Optional comment",
+                "required": false,
+                "name": "improvements_comment"
+              },
+              {
+                "type": "Footer",
+                "label": "Continue",
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": {
+                    "type": "screen",
+                    "name": "RATE"
+                  },
+                  "payload": {
+                    "recommend_to_friend": "${form.recommend_to_friend}",
+                    "improvements_comment": "${form.improvements_comment}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "RATE",
+      "title": "Green Trends — Feedback 2/2",
+      "terminal": true,
+      "success": true,
+      "data": {
+        "recommend_to_friend": {
+          "type": "string",
+          "__example__": "0_Yes"
+        },
+        "improvements_comment": {
+          "type": "string",
+          "__example__": ""
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "form",
+            "children": [
+              { "type": "TextBody", "text": "UNISEX HAIR & STYLE SALON" },
+              {
+                "type": "TextSubheading",
+                "text": "Rate your recent salon experience"
+              },
+              {
+                "type": "Dropdown",
+                "label": "Hair & styling service",
+                "required": true,
+                "name": "rate_hair_service",
+                "data-source": [
+                  {
+                    "id": "0_Excellent",
+                    "title": "★★★★★ • Excellent (5/5)"
+                  },
+                  {
+                    "id": "1_Good",
+                    "title": "★★★★☆ • Good (4/5)"
+                  },
+                  {
+                    "id": "2_Average",
+                    "title": "★★★☆☆ • Average (3/5)"
+                  },
+                  {
+                    "id": "3_Poor",
+                    "title": "★★☆☆☆ • Poor (2/5)"
+                  },
+                  {
+                    "id": "4_Very_Poor",
+                    "title": "★☆☆☆☆ • Very Poor (1/5)"
+                  }
+                ]
+              },
+              {
+                "type": "Dropdown",
+                "label": "Salon cleanliness & comfort",
+                "required": true,
+                "name": "rate_salon_cleanliness",
+                "data-source": [
+                  {
+                    "id": "0_Excellent",
+                    "title": "★★★★★ • Excellent (5/5)"
+                  },
+                  {
+                    "id": "1_Good",
+                    "title": "★★★★☆ • Good (4/5)"
+                  },
+                  {
+                    "id": "2_Average",
+                    "title": "★★★☆☆ • Average (3/5)"
+                  },
+                  {
+                    "id": "3_Poor",
+                    "title": "★★☆☆☆ • Poor (2/5)"
+                  },
+                  {
+                    "id": "4_Very_Poor",
+                    "title": "★☆☆☆☆ • Very Poor (1/5)"
+                  }
+                ]
+              },
+              {
+                "type": "Dropdown",
+                "label": "Staff courtesy & care",
+                "required": true,
+                "name": "rate_staff_courtesy",
+                "data-source": [
+                  {
+                    "id": "0_Excellent",
+                    "title": "★★★★★ • Excellent (5/5)"
+                  },
+                  {
+                    "id": "1_Good",
+                    "title": "★★★★☆ • Good (4/5)"
+                  },
+                  {
+                    "id": "2_Average",
+                    "title": "★★★☆☆ • Average (3/5)"
+                  },
+                  {
+                    "id": "3_Poor",
+                    "title": "★★☆☆☆ • Poor (2/5)"
+                  },
+                  {
+                    "id": "4_Very_Poor",
+                    "title": "★☆☆☆☆ • Very Poor (1/5)"
+                  }
+                ]
+              },
+              {
+                "type": "Footer",
+                "label": "Submit",
+                "on-click-action": {
+                  "name": "complete",
+                  "payload": {
+                    "feedback_recommend": "${data.recommend_to_friend}",
+                    "feedback_comment": "${data.improvements_comment}",
+                    "rate_hair_service": "${form.rate_hair_service}",
+                    "rate_salon_cleanliness": "${form.rate_salon_cleanliness}",
+                    "rate_staff_courtesy": "${form.rate_staff_courtesy}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

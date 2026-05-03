@@ -27,6 +27,48 @@ export function parseNfmReplyPayload(msg) {
   return null;
 }
 
+/** Static feedback Flow completion — booking completions always include `booking_date`. */
+export function isFeedbackFlowPayload(data) {
+  if (!data || typeof data !== "object") return false;
+  if (Object.prototype.hasOwnProperty.call(data, "booking_date")) return false;
+  return Object.prototype.hasOwnProperty.call(data, "rate_hair_service");
+}
+
+export function formatFeedbackThankYou(data) {
+  if (!data || typeof data !== "object") {
+    return "💚 Thank you for your feedback! — Green Trends";
+  }
+
+  const recRaw = String(data.feedback_recommend || "—");
+  const recPretty = recRaw.includes("Yes") || recRaw === "0_Yes" ? "Yes" : recRaw.includes("No") || recRaw === "1_No" ? "No" : recRaw;
+  const comment = String(data.feedback_comment || "").trim();
+
+  const starLabel = (id) => {
+    const m = String(id || "").match(/^(\d)_/);
+    if (!m) return id || "—";
+    const labels = ["Excellent (5/5)", "Good (4/5)", "Average (3/5)", "Poor (2/5)", "Very Poor (1/5)"];
+    return labels[Number(m[1])] || id;
+  };
+
+  const lines = [
+    "💚 *Thank you for your feedback!*",
+    "",
+    `*Recommend Green Trends:* ${recPretty}`
+  ];
+  if (comment) {
+    lines.push("", `*Your comment:* ${comment}`);
+  }
+  lines.push(
+    "",
+    `*Hair & styling:* ${starLabel(data.rate_hair_service)}`,
+    `*Salon cleanliness:* ${starLabel(data.rate_salon_cleanliness)}`,
+    `*Staff courtesy:* ${starLabel(data.rate_staff_courtesy)}`,
+    "",
+    "_Green Trends — Unisex Hair & Style Salon_"
+  );
+  return lines.join("\n");
+}
+
 export function formatBookingSummaryFromFlow(data) {
   if (!data || typeof data !== "object") {
     return "Thank you. We received your booking request and will contact you shortly.";
