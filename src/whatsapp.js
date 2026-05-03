@@ -184,12 +184,20 @@ export async function sendWelcomeActionButtons(to) {
   });
 }
 
+/** Must match RECOMMEND screen `data` in the published feedback Flow (CTA `data` cannot be `{}`). */
+function feedbackFlowInitialData() {
+  return {
+    feedback_channel: "whatsapp"
+  };
+}
+
 /** Static 2-screen feedback Flow (`whatsapp-flows/green-trends-feedback-flow.json`). */
 export async function sendFeedbackFlow(to, flowToken = "") {
   if (!config.flowIdFeedback || config.flowIdFeedback.includes("replace")) {
     throw new Error("FLOW_ID_FEEDBACK is not configured");
   }
   const token = String(flowToken || `token_${Date.now()}`);
+  const data = feedbackFlowInitialData();
 
   return sendMessage({
     messaging_product: "whatsapp",
@@ -217,7 +225,7 @@ export async function sendFeedbackFlow(to, flowToken = "") {
           flow_action: "navigate",
           flow_action_payload: {
             screen: "RECOMMEND",
-            data: {}
+            data
           }
         }
       }

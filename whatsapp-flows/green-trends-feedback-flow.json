@@ -8,7 +8,12 @@
     {
       "id": "RECOMMEND",
       "title": "Green Trends — Feedback 1/2",
-      "data": {},
+      "data": {
+        "feedback_channel": {
+          "type": "string",
+          "__example__": "whatsapp"
+        }
+      },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
