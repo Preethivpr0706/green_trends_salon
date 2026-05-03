@@ -1,12 +1,12 @@
 {
   "version": "7.3",
   "routing_model": {
-    "RECOMMEND": ["RATE"],
-    "RATE": []
+    "FEEDBACK_RATES": ["FEEDBACK_COMMENT"],
+    "FEEDBACK_COMMENT": []
   },
   "screens": [
     {
-      "id": "RECOMMEND",
+      "id": "FEEDBACK_RATES",
       "title": "Green Trends — Feedback 1/2",
       "data": {
         "feedback_channel": {
@@ -22,30 +22,74 @@
             "name": "form",
             "children": [
               { "type": "TextBody", "text": "UNISEX HAIR & STYLE SALON" },
-              { "type": "TextBody", "text": "We value your visit 💚" },
+              { "type": "TextBody", "text": "Help us improve — a few quick questions 💚" },
               {
                 "type": "TextSubheading",
-                "text": "Would you recommend Green Trends to a friend?"
+                "text": "How would you rate your overall experience at Green Trends?"
+              },
+              {
+                "type": "TextBody",
+                "text": "1 = Poor · 5 = Excellent"
+              },
+              {
+                "type": "Dropdown",
+                "label": "Overall experience",
+                "name": "overall_experience",
+                "required": true,
+                "data-source": [
+                  { "id": "5_Excellent", "title": "⭐⭐⭐⭐⭐ · Excellent (5/5)" },
+                  { "id": "4_Good", "title": "⭐⭐⭐⭐☆ · Good (4/5)" },
+                  { "id": "3_Average", "title": "⭐⭐⭐☆☆ · Average (3/5)" },
+                  { "id": "2_Poor", "title": "⭐⭐☆☆☆ · Poor (2/5)" },
+                  { "id": "1_Very_Poor", "title": "⭐☆☆☆☆ · Very poor (1/5)" }
+                ]
+              },
+              {
+                "type": "TextSubheading",
+                "text": "How satisfied are you with our staff’s professionalism and behavior?"
+              },
+              {
+                "type": "Dropdown",
+                "label": "Staff service",
+                "name": "staff_service",
+                "required": true,
+                "data-source": [
+                  { "id": "5_Excellent", "title": "⭐⭐⭐⭐⭐ · Excellent (5/5)" },
+                  { "id": "4_Good", "title": "⭐⭐⭐⭐☆ · Good (4/5)" },
+                  { "id": "3_Average", "title": "⭐⭐⭐☆☆ · Average (3/5)" },
+                  { "id": "2_Poor", "title": "⭐⭐☆☆☆ · Poor (2/5)" },
+                  { "id": "1_Very_Poor", "title": "⭐☆☆☆☆ · Very poor (1/5)" }
+                ]
+              },
+              {
+                "type": "TextSubheading",
+                "text": "Did our stylist understand your requirement and deliver the expected result?"
               },
               {
                 "type": "RadioButtonsGroup",
-                "label": "Choose one",
-                "name": "recommend_to_friend",
+                "label": "Service quality",
+                "name": "service_quality",
+                "required": true,
                 "data-source": [
-                  { "id": "0_Yes", "title": "Yes" },
-                  { "id": "1_No", "title": "No" }
-                ],
-                "required": true
+                  { "id": "fully_satisfied", "title": "Yes, fully satisfied" },
+                  { "id": "partially_satisfied", "title": "Partially satisfied" },
+                  { "id": "not_satisfied", "title": "Not satisfied" }
+                ]
               },
               {
                 "type": "TextSubheading",
-                "text": "How can we make your next visit even better?"
+                "text": "How do you feel about our pricing compared to the service provided?"
               },
               {
-                "type": "TextArea",
-                "label": "Optional comment",
-                "required": false,
-                "name": "improvements_comment"
+                "type": "RadioButtonsGroup",
+                "label": "Value for money",
+                "name": "value_for_money",
+                "required": true,
+                "data-source": [
+                  { "id": "worth_it", "title": "Worth it" },
+                  { "id": "average_value", "title": "Average" },
+                  { "id": "not_worth_it", "title": "Not worth it" }
+                ]
               },
               {
                 "type": "Footer",
@@ -54,11 +98,13 @@
                   "name": "navigate",
                   "next": {
                     "type": "screen",
-                    "name": "RATE"
+                    "name": "FEEDBACK_COMMENT"
                   },
                   "payload": {
-                    "recommend_to_friend": "${form.recommend_to_friend}",
-                    "improvements_comment": "${form.improvements_comment}"
+                    "overall_experience": "${form.overall_experience}",
+                    "staff_service": "${form.staff_service}",
+                    "service_quality": "${form.service_quality}",
+                    "value_for_money": "${form.value_for_money}"
                   }
                 }
               }
@@ -68,18 +114,26 @@
       }
     },
     {
-      "id": "RATE",
+      "id": "FEEDBACK_COMMENT",
       "title": "Green Trends — Feedback 2/2",
       "terminal": true,
       "success": true,
       "data": {
-        "recommend_to_friend": {
+        "overall_experience": {
           "type": "string",
-          "__example__": "0_Yes"
+          "__example__": "5_Excellent"
         },
-        "improvements_comment": {
+        "staff_service": {
           "type": "string",
-          "__example__": ""
+          "__example__": "5_Excellent"
+        },
+        "service_quality": {
+          "type": "string",
+          "__example__": "fully_satisfied"
+        },
+        "value_for_money": {
+          "type": "string",
+          "__example__": "worth_it"
         }
       },
       "layout": {
@@ -92,91 +146,13 @@
               { "type": "TextBody", "text": "UNISEX HAIR & STYLE SALON" },
               {
                 "type": "TextSubheading",
-                "text": "Rate your recent salon experience"
+                "text": "What can we improve to serve you better?"
               },
               {
-                "type": "Dropdown",
-                "label": "Hair & styling service",
-                "required": true,
-                "name": "rate_hair_service",
-                "data-source": [
-                  {
-                    "id": "0_Excellent",
-                    "title": "★★★★★ • Excellent (5/5)"
-                  },
-                  {
-                    "id": "1_Good",
-                    "title": "★★★★☆ • Good (4/5)"
-                  },
-                  {
-                    "id": "2_Average",
-                    "title": "★★★☆☆ • Average (3/5)"
-                  },
-                  {
-                    "id": "3_Poor",
-                    "title": "★★☆☆☆ • Poor (2/5)"
-                  },
-                  {
-                    "id": "4_Very_Poor",
-                    "title": "★☆☆☆☆ • Very Poor (1/5)"
-                  }
-                ]
-              },
-              {
-                "type": "Dropdown",
-                "label": "Salon cleanliness & comfort",
-                "required": true,
-                "name": "rate_salon_cleanliness",
-                "data-source": [
-                  {
-                    "id": "0_Excellent",
-                    "title": "★★★★★ • Excellent (5/5)"
-                  },
-                  {
-                    "id": "1_Good",
-                    "title": "★★★★☆ • Good (4/5)"
-                  },
-                  {
-                    "id": "2_Average",
-                    "title": "★★★☆☆ • Average (3/5)"
-                  },
-                  {
-                    "id": "3_Poor",
-                    "title": "★★☆☆☆ • Poor (2/5)"
-                  },
-                  {
-                    "id": "4_Very_Poor",
-                    "title": "★☆☆☆☆ • Very Poor (1/5)"
-                  }
-                ]
-              },
-              {
-                "type": "Dropdown",
-                "label": "Staff courtesy & care",
-                "required": true,
-                "name": "rate_staff_courtesy",
-                "data-source": [
-                  {
-                    "id": "0_Excellent",
-                    "title": "★★★★★ • Excellent (5/5)"
-                  },
-                  {
-                    "id": "1_Good",
-                    "title": "★★★★☆ • Good (4/5)"
-                  },
-                  {
-                    "id": "2_Average",
-                    "title": "★★★☆☆ • Average (3/5)"
-                  },
-                  {
-                    "id": "3_Poor",
-                    "title": "★★☆☆☆ • Poor (2/5)"
-                  },
-                  {
-                    "id": "4_Very_Poor",
-                    "title": "★☆☆☆☆ • Very Poor (1/5)"
-                  }
-                ]
+                "type": "TextArea",
+                "label": "Your suggestion (optional)",
+                "required": false,
+                "name": "improvement_suggestion"
               },
               {
                 "type": "Footer",
@@ -184,11 +160,11 @@
                 "on-click-action": {
                   "name": "complete",
                   "payload": {
-                    "feedback_recommend": "${data.recommend_to_friend}",
-                    "feedback_comment": "${data.improvements_comment}",
-                    "rate_hair_service": "${form.rate_hair_service}",
-                    "rate_salon_cleanliness": "${form.rate_salon_cleanliness}",
-                    "rate_staff_courtesy": "${form.rate_staff_courtesy}"
+                    "overall_experience": "${data.overall_experience}",
+                    "staff_service": "${data.staff_service}",
+                    "service_quality": "${data.service_quality}",
+                    "value_for_money": "${data.value_for_money}",
+                    "improvement_suggestion": "${form.improvement_suggestion}"
                   }
                 }
               }

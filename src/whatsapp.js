@@ -184,7 +184,7 @@ export async function sendWelcomeActionButtons(to) {
   });
 }
 
-/** Must match RECOMMEND screen `data` in the published feedback Flow (CTA `data` cannot be `{}`). */
+/** Must match FEEDBACK_RATES screen `data` in the published feedback Flow (CTA `data` cannot be `{}`). */
 function feedbackFlowInitialData() {
   return {
     feedback_channel: "whatsapp"
@@ -224,7 +224,7 @@ export async function sendFeedbackFlow(to, flowToken = "") {
           flow_cta: "Share feedback",
           flow_action: "navigate",
           flow_action_payload: {
-            screen: "RECOMMEND",
+            screen: "FEEDBACK_RATES",
             data
           }
         }

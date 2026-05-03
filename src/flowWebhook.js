@@ -31,7 +31,39 @@ export function parseNfmReplyPayload(msg) {
 export function isFeedbackFlowPayload(data) {
   if (!data || typeof data !== "object") return false;
   if (Object.prototype.hasOwnProperty.call(data, "booking_date")) return false;
-  return Object.prototype.hasOwnProperty.call(data, "rate_hair_service");
+  return Object.prototype.hasOwnProperty.call(data, "overall_experience");
+}
+
+function starRatingLabel(id) {
+  const m = String(id || "").match(/^(\d)_/);
+  if (!m) return id || "—";
+  const n = Number(m[1]);
+  const labels = {
+    5: "Excellent (5/5)",
+    4: "Good (4/5)",
+    3: "Average (3/5)",
+    2: "Poor (2/5)",
+    1: "Very poor (1/5)"
+  };
+  return labels[n] || id;
+}
+
+function serviceQualityLabel(id) {
+  const map = {
+    fully_satisfied: "Yes, fully satisfied",
+    partially_satisfied: "Partially satisfied",
+    not_satisfied: "Not satisfied"
+  };
+  return map[String(id)] || id || "—";
+}
+
+function valueForMoneyLabel(id) {
+  const map = {
+    worth_it: "Worth it",
+    average_value: "Average",
+    not_worth_it: "Not worth it"
+  };
+  return map[String(id)] || id || "—";
 }
 
 export function formatFeedbackThankYou(data) {
@@ -39,33 +71,20 @@ export function formatFeedbackThankYou(data) {
     return "💚 Thank you for your feedback! — Green Trends";
   }
 
-  const recRaw = String(data.feedback_recommend || "—");
-  const recPretty = recRaw.includes("Yes") || recRaw === "0_Yes" ? "Yes" : recRaw.includes("No") || recRaw === "1_No" ? "No" : recRaw;
-  const comment = String(data.feedback_comment || "").trim();
-
-  const starLabel = (id) => {
-    const m = String(id || "").match(/^(\d)_/);
-    if (!m) return id || "—";
-    const labels = ["Excellent (5/5)", "Good (4/5)", "Average (3/5)", "Poor (2/5)", "Very Poor (1/5)"];
-    return labels[Number(m[1])] || id;
-  };
+  const suggestion = String(data.improvement_suggestion || "").trim();
 
   const lines = [
     "💚 *Thank you for your feedback!*",
     "",
-    `*Recommend Green Trends:* ${recPretty}`
+    "*Overall experience:* " + starRatingLabel(data.overall_experience),
+    "*Staff service:* " + starRatingLabel(data.staff_service),
+    "*Service quality:* " + serviceQualityLabel(data.service_quality),
+    "*Value for money:* " + valueForMoneyLabel(data.value_for_money)
   ];
-  if (comment) {
-    lines.push("", `*Your comment:* ${comment}`);
+  if (suggestion) {
+    lines.push("", "*Improvement / suggestion:*", suggestion);
   }
-  lines.push(
-    "",
-    `*Hair & styling:* ${starLabel(data.rate_hair_service)}`,
-    `*Salon cleanliness:* ${starLabel(data.rate_salon_cleanliness)}`,
-    `*Staff courtesy:* ${starLabel(data.rate_staff_courtesy)}`,
-    "",
-    "_Green Trends — Unisex Hair & Style Salon_"
-  );
+  lines.push("", "_Green Trends — Unisex Hair & Style Salon_");
   return lines.join("\n");
 }
 
